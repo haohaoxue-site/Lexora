@@ -109,7 +109,7 @@ export class McpConnectorService {
     return this.#mutate(parsed.data.id, async () => {
       const existing = this.#connectors.findById(parsed.data.id)
       const previousRef = existing?.credentialRef ?? null
-      if (input.credential.mode === 'keep' && previousRef && existing && !sameTrustTarget(existing, parsed.data))
+      if (input.credential.mode === 'keep' && previousRef && existing && !sameExecutionTarget(existing, parsed.data))
         throw new McpConnectorError('VALIDATION_FAILED')
       if (input.credential.mode === 'replace' && (!connectorCredentialSchema.safeParse(input.credential.value).success || !credentialMatchesTransport(input.credential.value, parsed.data.transport)))
         throw new McpConnectorError('VALIDATION_FAILED')
@@ -128,17 +128,19 @@ export class McpConnectorService {
           await this.#restoreSecret(credentialRef ?? previousRef ?? parsed.data.id, previous)
         throw error
       }
-      if (!existing || !sameTrustTarget(existing, parsed.data) || input.credential.mode !== 'keep')
+      if (!existing || !sameExecutionTarget(existing, parsed.data) || input.credential.mode !== 'keep')
         this.#manager.clearCatalog(record.id)
       return record
     })
   }
 
-  trust(id: string, trusted = true): Promise<McpServerRecord> {
+  confirmExecution(id: string): Promise<McpServerRecord> {
     return this.#mutate(id, async () => {
       const record = this.#requireConnector(id)
+      if (record.transport !== 'stdio')
+        throw new McpConnectorError('VALIDATION_FAILED')
       const now = new Date().toISOString()
-      return this.#connectors.upsert({ ...record, trustedAt: trusted ? now : null, enabled: !trusted && record.transport === 'stdio' ? false : record.enabled, updatedAt: now })
+      return this.#connectors.upsert({ ...record, executionConfirmedAt: now, updatedAt: now })
     })
   }
 
@@ -293,8 +295,8 @@ export class McpConnectorService {
       const result = createMcpTools({
         serverId: connector.id,
         serverName: connector.name,
+        generation,
         tools: this.#manager.catalog(connector.id),
-        trusted: connector.trustedAt !== null,
         callTool: (tool, parameters, signal, onProgress) => this.#manager.callTool(connector.id, generation, tool, parameters, signal, onProgress),
         writeResult,
       })
@@ -370,11 +372,11 @@ export class McpConnectorService {
     if (!parsed.success)
       throw new McpConnectorError('VALIDATION_FAILED')
     const existing = this.#connectors.findById(parsed.data.id)
-    const trustedAt = existing && sameTrustTarget(existing, parsed.data) && !(credentialChanged && parsed.data.transport === 'stdio') ? existing.trustedAt : null
-    if (parsed.data.transport === 'stdio' && parsed.data.enabled && !trustedAt)
-      throw new McpConnectorError('MCP_CONNECTOR_TRUST_REQUIRED')
+    const executionConfirmedAt = existing && sameExecutionTarget(existing, parsed.data) && !(credentialChanged && parsed.data.transport === 'stdio') ? existing.executionConfirmedAt : null
+    if (parsed.data.transport === 'stdio' && parsed.data.enabled && !executionConfirmedAt)
+      throw new McpConnectorError('MCP_EXECUTION_CONFIRMATION_REQUIRED')
     const now = new Date().toISOString()
-    return this.#connectors.upsert(toRecord(parsed.data, existing?.createdAt ?? now, now, trustedAt))
+    return this.#connectors.upsert(toRecord(parsed.data, existing?.createdAt ?? now, now, executionConfirmedAt))
   }
 
   async #restoreSecret(id: string, credential: ConnectorCredential | null): Promise<void> {
@@ -452,13 +454,13 @@ function toRecord(
   config: McpServerConfig,
   createdAt: string,
   updatedAt: string,
-  trustedAt: string | null,
+  executionConfirmedAt: string | null,
 ): McpServerRecord {
   return config.transport === 'stdio'
     ? {
         ...config,
         createdAt,
-        trustedAt,
+        executionConfirmedAt,
         updatedAt,
         url: null,
       }
@@ -468,7 +470,7 @@ function toRecord(
         command: null,
         createdAt,
         cwd: null,
-        trustedAt,
+        executionConfirmedAt,
         updatedAt,
       }
 }
@@ -500,7 +502,7 @@ function toConfig(record: McpServerRecord): McpServerConfig {
   })
 }
 
-function sameTrustTarget(record: McpServerRecord, config: McpServerConfig): boolean {
+function sameExecutionTarget(record: McpServerRecord, config: McpServerConfig): boolean {
   if (record.transport !== config.transport)
     return false
   if (config.transport === 'stdio') {

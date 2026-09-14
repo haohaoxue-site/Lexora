@@ -1,3 +1,4 @@
+import type { ApprovalGrantScope } from '@buddy-shared/permissions/approvalReviewPayload'
 import type { LocalRunEvent } from '@buddy-shared/runs/runApi'
 
 export type ChatContextUsageSegmentKind = 'mcp' | 'messages' | 'skills' | 'systemPrompt' | 'tools'
@@ -33,4 +34,4 @@ export interface ChatRunEventBucket {
 
 export type ChatRunEventBuckets = ReadonlyMap<string, ChatRunEventBucket>
 
-export type ChatApprovalDecision = 'approve' | 'approveForTurn' | 'deny'
+export type ChatApprovalDecision = ApprovalGrantScope | 'deny'

@@ -453,9 +453,15 @@ function finalizeDecision(
   request: PermissionRequest,
   decision: PermissionDecision,
 ): PermissionDecision {
-  return decision.type === 'ask' && !request.approvalAvailable
-    ? deny('APPROVAL_UNAVAILABLE_IN_BACKGROUND', 'profile')
+  const requiredDecision = request.requireApproval && decision.type === 'allow'
+    ? ask({
+        kind: request.approval?.kind ?? approvalKindFor(request.access ?? 'interaction'),
+        summary: request.approval?.summary ?? summaryFor(request.access ?? 'interaction'),
+      })
     : decision
+  return requiredDecision.type === 'ask' && !request.approvalAvailable
+    ? deny('APPROVAL_UNAVAILABLE_IN_BACKGROUND', 'profile')
+    : requiredDecision
 }
 
 function toDecisionPaths(

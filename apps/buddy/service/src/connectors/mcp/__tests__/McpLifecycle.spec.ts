@@ -25,7 +25,7 @@ const config = { id: 'lifecycle', name: 'Original name', command: process.execPa
 
 async function ready(service: McpConnectorService) {
   await service.upsert(config)
-  await service.trust(config.id)
+  await service.confirmExecution(config.id)
   await service.setEnabled(config.id, true)
   await vi.waitUntil(() => service.state(config.id).status === 'ready')
 }
@@ -64,7 +64,7 @@ describe('mCP global lifecycle', () => {
   it('reaps a temporary test connection without enabling it', async () => {
     const { service } = fixture()
     await service.upsert(config)
-    await service.trust(config.id)
+    await service.confirmExecution(config.id)
     expect(await service.test(config.id)).toMatchObject({ status: 'ready', toolCount: 4 })
     expect(service.list()[0]?.enabled).toBe(false)
     expect(service.getTools().tools).toHaveLength(0)

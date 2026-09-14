@@ -25,6 +25,7 @@ import type { DirectoryPage, FilePreview } from '../../shared/files/filePreview'
 import type { WebSettings, WebSettingsSnapshot } from '../../shared/network/webProtocol'
 import type { LocalNotificationList } from '../../shared/notifications/notificationApi'
 import type { LocalApproval } from '../../shared/permissions/approvalApi'
+import type { ApprovalGrantScope } from '../../shared/permissions/approvalReviewPayload'
 import type { BuddyPermissionSettings } from '../../shared/permissions/permissionMode'
 import type { LocalBuiltinProviderPreset, LocalCustomProvider, LocalCustomProviderModel, LocalDefaultModel, LocalModelSnapshot, LocalProvider, LocalProviderAuthChallenge, LocalRuntimeModelOption } from '../../shared/providers/providerApi'
 import type { ModelCapabilityOverrides } from '../../shared/providers/providerCapabilities'
@@ -58,7 +59,6 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   webCredentialSave: 'lexora:buddy:web:save-credential',
   webCredentialReveal: 'lexora:buddy:web:reveal-credential',
   approvalsApprove: 'lexora:buddy:approvals:approve',
-  approvalsApproveForTurn: 'lexora:buddy:approvals:approve-for-turn',
   approvalsDeny: 'lexora:buddy:approvals:deny',
   approvalsList: 'lexora:buddy:approvals:list',
   artifactsReadText: 'lexora:buddy:artifacts:read-text',
@@ -106,7 +106,7 @@ export const LOCAL_CHAT_IPC_CHANNELS = {
   connectorsList: 'lexora:buddy:connectors:list',
   connectorsRemove: 'lexora:buddy:connectors:remove',
   connectorsSetCredential: 'lexora:buddy:connectors:set-credential',
-  connectorsTrust: 'lexora:buddy:connectors:trust',
+  connectorsConfirmExecution: 'lexora:buddy:connectors:confirm-execution',
   connectorsUpsert: 'lexora:buddy:connectors:upsert',
   conversationsDelete: 'lexora:buddy:conversations:delete',
   conversationsActivateBranch: 'lexora:buddy:conversations:activate-branch',
@@ -329,7 +329,7 @@ export interface LocalChatApi {
       credential: LocalConnectorCredentialMutation
     }) => Promise<ReadonlyArray<LocalConnector>>
     remove: (connectorId: string) => Promise<LocalMutationResult>
-    trust: (connectorId: string, trusted?: boolean) => Promise<LocalMutationResult>
+    confirmExecution: (connectorId: string) => Promise<LocalMutationResult>
     setCredential: (
       connectorId: string,
       credential: LocalConnectorCredential,
@@ -409,8 +409,7 @@ export interface LocalChatApi {
       runId?: string | null
       status?: 'pending' | 'approved' | 'denied' | 'cancelled' | null
     }) => Promise<ReadonlyArray<LocalApproval>>
-    approve: (approvalId: string) => Promise<LocalApproval>
-    approveForTurn: (approvalId: string) => Promise<LocalApproval>
+    approve: (approvalId: string, scope: ApprovalGrantScope) => Promise<LocalApproval>
     deny: (approvalId: string) => Promise<LocalApproval>
   }
   composerResources: {

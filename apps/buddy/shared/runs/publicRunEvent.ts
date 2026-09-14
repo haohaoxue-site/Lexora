@@ -48,6 +48,7 @@ const SCALAR_PAYLOAD_KEYS = new Map<string, readonly string[]>([
   ['approval.requested', ['id', 'kind', 'status', 'summary', 'toolCallId']],
   ['approval.resolved', ['id', 'resolution', 'resolvedAt', 'status']],
   ['approval.turn_reused', ['sourceApprovalId', 'toolCallId', 'toolName']],
+  ['approval.reused', ['scope', 'sourceApprovalId', 'toolCallId', 'toolName']],
   ['context.compaction.cancelled', ['reason', 'willRetry']],
   ['context.compaction.completed', ['estimatedTokensAfter', 'reason', 'tokensBefore', 'willRetry']],
   ['context.compaction.failed', ['errorCode', 'reason', 'willRetry']],

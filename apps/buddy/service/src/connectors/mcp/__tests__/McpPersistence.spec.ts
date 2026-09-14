@@ -10,17 +10,17 @@ import { openBuddyDatabase } from '../../../storage/database'
 import { BUDDY_SCHEMA_MIGRATIONS, BUDDY_SCHEMA_VERSION } from '../../../storage/schema'
 import { createMcpResultWriter } from '../McpResultStore'
 
-const record = { id: 'existing', name: 'Existing connector', transport: 'stdio' as const, command: 'node', args: ['server.mjs'], cwd: null, url: null, credentialRef: 'existing-secret-ref', enabled: true, trustedAt: '2026-08-01T00:00:00Z', createdAt: '2026-08-01T00:00:00Z', updatedAt: '2026-08-01T00:00:00Z' }
+const record = { id: 'existing', name: 'Existing connector', transport: 'stdio' as const, command: 'node', args: ['server.mjs'], cwd: null, url: null, credentialRef: 'existing-secret-ref', enabled: true, executionConfirmedAt: '2026-08-01T00:00:00Z', createdAt: '2026-08-01T00:00:00Z', updatedAt: '2026-08-01T00:00:00Z' }
 
 describe('mCP persisted data', () => {
-  it('upgrades a version 17 database while retaining connector identity, trust and secret reference', async () => {
+  it('upgrades a version 17 database while retaining connector identity, execution confirmation and secret reference', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'buddy-mcp-upgrade-'))
     const path = join(directory, 'buddy.sqlite3')
     const previous = new DatabaseSync(path)
     try {
       for (const migration of BUDDY_SCHEMA_MIGRATIONS.filter(migration => migration.version <= 17))
         previous.exec(migration.sql)
-      previous.prepare('INSERT INTO mcp_servers (id, name, transport, command, args_json, cwd, url, credential_ref, trusted_at, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(record.id, record.name, record.transport, record.command, JSON.stringify(record.args), record.cwd, record.url, record.credentialRef, record.trustedAt, 1, record.createdAt, record.updatedAt)
+      previous.prepare('INSERT INTO mcp_servers (id, name, transport, command, args_json, cwd, url, credential_ref, trusted_at, enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(record.id, record.name, record.transport, record.command, JSON.stringify(record.args), record.cwd, record.url, record.credentialRef, record.executionConfirmedAt, 1, record.createdAt, record.updatedAt)
       previous.exec('PRAGMA user_version = 17')
     }
     finally { previous.close() }

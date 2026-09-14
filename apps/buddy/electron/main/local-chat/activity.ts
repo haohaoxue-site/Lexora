@@ -34,9 +34,7 @@ export function registerActivityIpc(context: LocalChatIpcContext): void {
 
   handle(LOCAL_CHAT_IPC_CHANNELS.approvalsList, (_event, input) => request(approvalsRpc.list, approvalsRequestSchemas.listApprovals.parse(input)))
 
-  handle(LOCAL_CHAT_IPC_CHANNELS.approvalsApprove, (_event, input) => request(approvalsRpc.approve, approvalsRequestSchemas.approvalId.parse(input)))
-
-  handle(LOCAL_CHAT_IPC_CHANNELS.approvalsApproveForTurn, (_event, input) => request(approvalsRpc.approveForTurn, approvalsRequestSchemas.approvalId.parse(input)))
+  handle(LOCAL_CHAT_IPC_CHANNELS.approvalsApprove, (_event, input) => request(approvalsRpc.approve, approvalsRequestSchemas.approvalGrant.parse(input)))
 
   handle(LOCAL_CHAT_IPC_CHANNELS.approvalsDeny, (_event, input) => request(approvalsRpc.deny, approvalsRequestSchemas.approvalId.parse(input)))
 

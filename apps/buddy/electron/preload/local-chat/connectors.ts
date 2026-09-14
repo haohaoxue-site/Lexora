@@ -15,8 +15,8 @@ export function createConnectorsApi(): Pick<LocalChatApi, 'connectors'> {
         ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.connectorsUpsert, input),
       remove: connectorId =>
         ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.connectorsRemove, { connectorId }),
-      trust: (connectorId, trusted = true) =>
-        ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.connectorsTrust, { connectorId, trusted }),
+      confirmExecution: connectorId =>
+        ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.connectorsConfirmExecution, { connectorId }),
       setCredential: (connectorId, credential) =>
         ipcRenderer.invoke(
           LOCAL_CHAT_IPC_CHANNELS.connectorsSetCredential,

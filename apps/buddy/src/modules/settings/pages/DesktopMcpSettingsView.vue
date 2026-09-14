@@ -2,7 +2,7 @@
 import type { LocalConnector } from '@buddy-shared/connectors/connectorApi'
 import type { ConnectorRuntimeState, ConnectorToolSummary } from '@buddy-shared/connectors/connectorState'
 import type { DesktopConnectorSavePlan } from '../model/desktopConnectorForm'
-import { NAlert, NButton, NCheckbox, NEmpty, NModal } from 'naive-ui'
+import { NAlert, NButton, NEmpty, NModal } from 'naive-ui'
 import { computed, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopSettingsPageLayout from '../layouts/DesktopSettingsPageLayout.vue'
@@ -19,8 +19,7 @@ const editor = shallowRef<{ connector: LocalConnector | null } | null>(null)
 const importing = shallowRef(false)
 const toolList = shallowRef<{ id: string, tools: readonly ConnectorToolSummary[] } | null>(null)
 const toolConnector = computed(() => connectors.value.find(connector => connector.id === toolList.value?.id))
-const trust = shallowRef<{ connector: LocalConnector, next: 'test' | 'enable' | null } | null>(null)
-const trustHints = shallowRef(false)
+const executionConfirmation = shallowRef<{ connector: LocalConnector, next: 'test' | 'enable' } | null>(null)
 const testResult = shallowRef<{ name: string, enabled: boolean, state: ConnectorRuntimeState } | null>(null)
 let mounted = true
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -50,8 +49,8 @@ function login(connector: LocalConnector) {
   return mcp.login(connector.id)
 }
 async function test(connector: LocalConnector) {
-  if (connector.transport === 'stdio' && !connector.trusted) {
-    trust.value = { connector, next: 'test' }
+  if (connector.transport === 'stdio' && !connector.executionConfirmed) {
+    executionConfirmation.value = { connector, next: 'test' }
     return
   }
   const state = await mcp.test(connector.id)
@@ -60,29 +59,25 @@ async function test(connector: LocalConnector) {
 }
 async function toggle(connector: LocalConnector, enabled: boolean) {
   testResult.value = null
-  if (enabled && connector.transport === 'stdio' && !connector.trusted)
-    trust.value = { connector, next: 'enable' }
+  if (enabled && connector.transport === 'stdio' && !connector.executionConfirmed)
+    executionConfirmation.value = { connector, next: 'enable' }
   else
     await mcp.setEnabled(connector.id, enabled)
 }
-async function confirmTrust() {
-  const pending = trust.value
-  if (!pending || !await mcp.trust(pending.connector.id, pending.connector.transport === 'stdio' || trustHints.value))
+async function confirmExecution() {
+  const pending = executionConfirmation.value
+  if (!pending || !await mcp.confirmExecution(pending.connector.id))
     return
-  trust.value = null
+  executionConfirmation.value = null
   if (pending.next === 'enable')
     await mcp.setEnabled(pending.connector.id, true)
   else if (pending.next === 'test')
-    await test({ ...pending.connector, trusted: true })
+    await test({ ...pending.connector, executionConfirmed: true })
 }
 async function showTools(connector: LocalConnector) {
   const tools = await mcp.tools(connector.id)
   if (tools)
     toolList.value = { id: connector.id, tools }
-}
-function permissions(connector: LocalConnector) {
-  trustHints.value = connector.trusted
-  trust.value = { connector, next: null }
 }
 function formatStdioTarget(connector: LocalConnector): string {
   if (connector.transport !== 'stdio')
@@ -131,22 +126,17 @@ function formatStdioTarget(connector: LocalConnector): string {
       <DesktopMcpConnectionCard
         v-for="connector in connectors" :key="connector.id" :connector="connector" :language="language" :busy="!!busyId"
         @toggle="toggle(connector, $event)" @edit="editor = { connector }" @test="test(connector)" @tools="showTools(connector)"
-        @trust="permissions(connector)" @remove="mcp.remove(connector.id)" @login="login(connector)" @cancel-login="mcp.cancelLogin(connector.id)" @clear-credential="mcp.clearCredential(connector.id)"
+        @remove="mcp.remove(connector.id)" @login="login(connector)" @cancel-login="mcp.cancelLogin(connector.id)" @clear-credential="mcp.clearCredential(connector.id)"
       />
     </section>
     <DesktopMcpConnectionEditor v-if="editor" :connector="editor.connector" :language="language" :busy="!!busyId" :error="error" @close="editor = null" @save="save" />
     <DesktopMcpImportDialog v-if="importing" :language="language" :save="mcp.save" :error="error" @close="importing = false" />
-    <NModal v-if="trust" show preset="card" :title="t(trust?.connector.transport === 'stdio' ? 'desktop.mcp.trustTitle' : 'desktop.mcp.permissions')" :style="{ width: 'min(520px, calc(100vw - 48px))' }" :closable="!busyId" :mask-closable="!busyId" @close="trust = null" @update:show="value => !value && (trust = null)">
-      <template v-if="trust">
-        <p>{{ t(trust.connector.transport === 'stdio' ? 'desktop.mcp.trustDescription' : 'desktop.mcp.trustRemoteDescription') }}</p>
-        <pre v-if="trust.connector.transport === 'stdio'" class="mcp-settings__target">{{ formatStdioTarget(trust.connector) }}</pre>
-        <p v-else>
-          <NCheckbox v-model:checked="trustHints" :disabled="!!busyId">
-            {{ t('desktop.mcp.trustHints') }}
-          </NCheckbox>
-        </p>
-        <NButton type="primary" :loading="!!busyId" @click="confirmTrust">
-          {{ t(trust.connector.transport === 'stdio' ? 'desktop.mcp.trust' : 'desktop.mcp.save') }}
+    <NModal v-if="executionConfirmation" show preset="card" :title="t('desktop.mcp.confirmExecutionTitle')" :style="{ width: 'min(520px, calc(100vw - 48px))' }" :closable="!busyId" :mask-closable="!busyId" @close="executionConfirmation = null" @update:show="value => !value && (executionConfirmation = null)">
+      <template v-if="executionConfirmation">
+        <p>{{ t('desktop.mcp.confirmExecutionDescription') }}</p>
+        <pre class="mcp-settings__target">{{ formatStdioTarget(executionConfirmation.connector) }}</pre>
+        <NButton type="primary" :loading="!!busyId" @click="confirmExecution">
+          {{ t('desktop.mcp.confirmExecution') }}
         </NButton>
       </template>
     </NModal>

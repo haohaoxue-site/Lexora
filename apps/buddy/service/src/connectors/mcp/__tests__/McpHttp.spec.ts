@@ -162,12 +162,11 @@ describe('mCP HTTP and authorization', () => {
       database.close()
     })
     await service.upsert({ id: 'http', name: 'HTTP', url: `${fixture.base}/mcp`, transport: 'streamable-http', enabled: false, credentialRef: null })
-    await service.trust('http')
     await service.setEnabled('http', true)
     await vi.waitUntil(() => service.state('http').status === 'ready')
     const snapshot = service.getTools()
     const tool = snapshot.tools[0]!
-    expect(snapshot.classifications.get(tool.name)).toEqual({ access: 'read' })
+    expect(snapshot.classifications.get(tool.name)).toMatchObject({ access: 'network', requireApproval: true })
     fixture.changeAnnotations()
     expect(await tool.execute('call', { value: 'hello' }, undefined, undefined, {} as never)).toMatchObject({ details: { code: 'MCP_TOOL_CHANGED' } })
     expect(fixture.requests.some(request => request.method === 'tools/call')).toBe(false)

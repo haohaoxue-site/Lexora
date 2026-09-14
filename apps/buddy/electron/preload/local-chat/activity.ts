@@ -29,10 +29,8 @@ export function createActivityApi(): Pick<LocalChatApi, 'artifacts' | 'notificat
     }),
     approvals: Object.freeze({
       list: input => ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsList, input ?? {}),
-      approve: approvalId =>
-        ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsApprove, { approvalId }),
-      approveForTurn: approvalId =>
-        ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsApproveForTurn, { approvalId }),
+      approve: (approvalId, scope) =>
+        ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsApprove, { approvalId, scope }),
       deny: approvalId =>
         ipcRenderer.invoke(LOCAL_CHAT_IPC_CHANNELS.approvalsDeny, { approvalId }),
     }),

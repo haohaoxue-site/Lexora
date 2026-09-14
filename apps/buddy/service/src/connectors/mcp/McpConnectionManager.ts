@@ -106,7 +106,7 @@ export class McpConnectionManager {
   available(id: string, generation: number): boolean {
     const record = this.#options.repository.findById(id)
     return !this.#closed && !this.#paused.has(id) && generation === this.generation(id) && record?.enabled === true
-      && (record.transport !== 'stdio' || record.trustedAt !== null)
+      && (record.transport !== 'stdio' || record.executionConfirmedAt !== null)
   }
 
   async reset(id: string, clearCatalog = false): Promise<void> {
@@ -271,8 +271,8 @@ export class McpConnectionManager {
     const record = this.#options.repository.findById(id)
     if (this.#closed || this.#paused.has(id) || !record)
       throw new McpClientError('MCP_SERVER_UNAVAILABLE')
-    if (record.transport === 'stdio' && !record.trustedAt)
-      throw new McpClientError('MCP_CONNECTOR_TRUST_REQUIRED')
+    if (record.transport === 'stdio' && !record.executionConfirmedAt)
+      throw new McpClientError('MCP_EXECUTION_CONFIRMATION_REQUIRED')
     return record
   }
 

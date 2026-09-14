@@ -12,9 +12,9 @@ import { normalizeMcpResult } from './mcpToolResults'
 export interface CreateMcpToolsOptions {
   serverId: string
   serverName: string
+  generation: number
   callTool: (tool: McpRemoteTool, arguments_: unknown, signal?: AbortSignal, onProgress?: (progress: Progress) => void) => Promise<CallToolResult>
   tools: readonly McpRemoteTool[]
-  trusted: boolean
   writeResult?: McpResultWriter
 }
 
@@ -74,7 +74,7 @@ export function createMcpTools(options: CreateMcpToolsOptions): McpToolsResult {
         }
       },
     }))
-    classifications.set(name, classifyTool(options.trusted, remoteTool, options.serverName))
+    classifications.set(name, classifyTool(options, remoteTool))
   }
   return { classifications, diagnostics, tools }
 }
@@ -85,12 +85,17 @@ export function createMcpToolName(serverId: string, toolName: string): string {
   return `mcp__${hash(serverId)}__${readable}_${hash(toolName)}`
 }
 
-function classifyTool(trusted: boolean, tool: McpRemoteTool, serverName: string): BuddyToolClassification {
-  if (trusted && tool.annotations?.readOnlyHint === true && tool.annotations.openWorldHint === false)
-    return { access: 'read' }
+function classifyTool(options: Pick<CreateMcpToolsOptions, 'generation' | 'serverId' | 'serverName'>, tool: McpRemoteTool): BuddyToolClassification {
   return {
     access: 'network',
-    approval: { kind: 'mcp', summary: `${serverName}: ${tool.title ?? tool.name}` },
-    forceAsk: !trusted || (tool.annotations?.readOnlyHint !== true && tool.annotations?.destructiveHint !== false),
+    approval: {
+      kind: 'mcp',
+      reuse: {
+        operation: [options.serverId, options.generation, tool.name],
+        source: [options.serverId, options.generation],
+      },
+      summary: `${options.serverName}: ${tool.title ?? tool.name}`,
+    },
+    requireApproval: true,
   }
 }

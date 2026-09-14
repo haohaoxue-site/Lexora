@@ -305,11 +305,12 @@ describe('approvalService', () => {
       },
       {
         payload: {
+          scope: 'turn',
           sourceApprovalId: initialApproval.id,
           toolCallId: 'tool-follow-up',
           toolName: 'bash',
         },
-        type: 'approval.turn_reused',
+        type: 'approval.reused',
       },
     ]))
     expect(repository.list({ runId: 'run-turn-approval' })).toHaveLength(1)

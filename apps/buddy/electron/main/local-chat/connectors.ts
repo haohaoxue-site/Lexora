@@ -24,7 +24,7 @@ export function registerConnectorsIpc(context: LocalChatIpcContext): void {
 
   handle(LOCAL_CHAT_IPC_CHANNELS.connectorsRemove, (_event, input) => request(connectorsRpc.remove, connectorsRequestSchemas.connectorId.parse(input)))
 
-  handle(LOCAL_CHAT_IPC_CHANNELS.connectorsTrust, (_event, input) => request(connectorsRpc.trust, connectorsRequestSchemas.connectorTrusted.parse(input)))
+  handle(LOCAL_CHAT_IPC_CHANNELS.connectorsConfirmExecution, (_event, input) => request(connectorsRpc.confirmExecution, connectorsRequestSchemas.connectorExecutionConfirmation.parse(input)))
 
   handle(LOCAL_CHAT_IPC_CHANNELS.connectorsSetCredential, async (_event, input) => {
     const { connectorId, credential } = connectorsRequestSchemas.connectorCredential.parse(input)

@@ -62,6 +62,7 @@ describe('registerApprovalRpc', () => {
         allowForTurn: true,
         card: 'shell',
         command: 'API_TOKEN=[redacted] curl --token=[redacted] https://example.com',
+        reuseScopes: ['operation', 'source', 'turn'],
         toolName: 'bash',
       },
       status: 'pending',
@@ -69,7 +70,7 @@ describe('registerApprovalRpc', () => {
     expect(JSON.stringify(listed)).not.toContain('super-secret')
     expect(JSON.stringify(listed)).not.toContain('another-secret')
 
-    const approved = await harness.invoke('approvals.approveForTurn', { approvalId: pending.id })
+    const approved = await harness.invoke('approvals.approve', { approvalId: pending.id, scope: 'turn' })
     expect(approved).toMatchObject({ id: pending.id, kind: 'shell', status: 'approved' })
     await expect(decision).resolves.toEqual({
       approvalId: pending.id,
