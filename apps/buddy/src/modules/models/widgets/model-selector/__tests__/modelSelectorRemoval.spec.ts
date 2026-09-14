@@ -23,6 +23,7 @@ describe('model selector after service removal', () => {
       selectedServiceTier: null,
     })
     const root = document.createElement('div')
+    root.className = 'buddy-app'
     document.body.append(root)
     const app = createApp({ setup: () => () => h(DesktopModelSelector, props) })
     app.mount(root)

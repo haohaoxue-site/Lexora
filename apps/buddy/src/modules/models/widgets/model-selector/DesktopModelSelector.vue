@@ -12,6 +12,7 @@ import {
   DismissCircle16Filled,
   Flash20Filled,
 } from '@vicons/fluent'
+import { NPopover } from 'naive-ui'
 import { computed, useTemplateRef } from 'vue'
 
 import { useBuddyI18n } from '@/i18n/buddyI18n'
@@ -96,185 +97,196 @@ const {
 
 <template>
   <div ref="root" class="desktop-model-selector">
-    <div
-      class="desktop-model-selector__control"
-      :class="{ 'is-clearable': canClearModel }"
+    <NPopover
+      class="buddy-raw-popover"
+      raw
+      trigger="manual"
+      to=".buddy-app"
+      :show="isOpen"
+      :show-arrow="false"
+      :animated="false"
+      :placement="placement"
+      :theme-overrides="{ space: placement === 'bottom-start' ? '0.55rem' : '0.65rem' }"
     >
-      <button
-        class="desktop-model-selector__trigger"
-        :class="[`is-${surface}`, { 'is-fast': isFastMode }]"
-        type="button"
-        aria-haspopup="menu"
-        :aria-expanded="isOpen"
-        :disabled="!canOpen"
-        @click="toggle"
-      >
-        <DesktopIcon v-if="isFastMode" class="desktop-model-selector__flash" :component="Flash20Filled" />
-        <span class="desktop-model-selector__model">
-          {{ modelLabel }}
-        </span>
-        <span v-if="selectedEffortLabel" class="desktop-model-selector__separator">·</span>
-        <span v-if="selectedEffortLabel" class="desktop-model-selector__effort">
-          {{ selectedEffortLabel }}{{ isEffortUnavailable ? ` (${t('common.unavailable')})` : '' }}
-        </span>
-      </button>
-      <button
-        v-if="canClearModel"
-        class="desktop-model-selector__clear"
-        type="button"
-        :aria-label="t('desktop.chat.clearModel')"
-        @click="clearModel"
-      >
-        <DesktopIcon :component="DismissCircle16Filled" />
-      </button>
-    </div>
-
-    <div
-      v-if="isOpen"
-      class="desktop-model-selector__popover"
-      :class="`is-${placement}`"
-      @pointerdown.stop
-    >
-      <section
-        v-if="activePanel === 'main'"
-        class="desktop-model-selector__panel desktop-model-selector__panel--spell"
-      >
-        <div class="desktop-model-selector__panel-heading">
+      <template #trigger>
+        <div
+          class="desktop-model-selector__control"
+          :class="{ 'is-clearable': canClearModel }"
+        >
           <button
-            class="desktop-model-selector__advanced"
+            class="desktop-model-selector__trigger"
+            :class="[`is-${surface}`, { 'is-fast': isFastMode }]"
             type="button"
-            @click="openAdvancedPanel"
+            aria-haspopup="menu"
+            :aria-expanded="isOpen"
+            :disabled="!canOpen"
+            @click="toggle"
           >
+            <DesktopIcon v-if="isFastMode" class="desktop-model-selector__flash" :component="Flash20Filled" />
+            <span class="desktop-model-selector__model">
+              {{ modelLabel }}
+            </span>
+            <span v-if="selectedEffortLabel" class="desktop-model-selector__separator">·</span>
+            <span v-if="selectedEffortLabel" class="desktop-model-selector__effort">
+              {{ selectedEffortLabel }}{{ isEffortUnavailable ? ` (${t('common.unavailable')})` : '' }}
+            </span>
+          </button>
+          <button
+            v-if="canClearModel"
+            class="desktop-model-selector__clear"
+            type="button"
+            :aria-label="t('desktop.chat.clearModel')"
+            @click="clearModel"
+          >
+            <DesktopIcon :component="DismissCircle16Filled" />
+          </button>
+        </div>
+      </template>
+
+      <div
+        class="desktop-model-selector__popover"
+        :class="`is-${placement}`"
+        @pointerdown.stop
+      >
+        <section
+          v-if="activePanel === 'main'"
+          class="desktop-model-selector__panel desktop-model-selector__panel--spell"
+        >
+          <div class="desktop-model-selector__panel-heading">
+            <button
+              class="desktop-model-selector__advanced"
+              type="button"
+              @click="openAdvancedPanel"
+            >
+              <span>{{ t('desktop.chat.advanced') }}</span>
+              <DesktopIcon :component="ChevronRight16Regular" />
+            </button>
+            <span class="desktop-model-selector__heading-status">
+              <Transition name="desktop-model-selector__status" mode="out-in">
+                <span
+                  v-if="isMeterDragging"
+                  key="reasoning-level"
+                  class="desktop-model-selector__dragging-effort"
+                  :class="`is-${effortTransitionDirection}`"
+                >
+                  <Transition :name="`desktop-model-selector__effort-${effortTransitionDirection}`">
+                    <span
+                      :key="displayedEffort ?? 'none'"
+                      class="desktop-model-selector__dragging-effort-label"
+                    >
+                      {{ displayedEffortLabel }}
+                    </span>
+                  </Transition>
+                </span>
+                <button
+                  v-else-if="supportsFastMode"
+                  key="fast-toggle"
+                  class="desktop-model-selector__fast-toggle"
+                  :class="{ 'is-active': isFastMode }"
+                  type="button"
+                  role="switch"
+                  :aria-checked="isFastMode"
+                  :aria-label="t('desktop.chat.fastMode')"
+                  @click="toggleFastMode"
+                >
+                  <DesktopIcon :component="Flash20Filled" />
+                </button>
+              </Transition>
+            </span>
+          </div>
+
+          <div v-if="reasoningLevelOptions.length" class="desktop-model-selector__spell">
+            <DesktopReasoningPicker
+              v-if="isEffortUnavailable"
+              :language="language"
+              :options="reasoningLevelOptions"
+              :selected-effort="selectedEffortValue"
+              @select="selectEffort"
+            />
+            <DesktopReasoningMeter
+              v-else
+              :label="t('desktop.chat.effort')"
+              :options="reasoningLevelOptions"
+              :selected-effort="selectedEffortValue"
+              @dragging="updateMeterDragging"
+              @preview="previewMeterEffort"
+              @select="selectMeterEffort"
+            />
+          </div>
+          <div v-else class="desktop-model-selector__no-reasoning">
+            {{ t('desktop.chat.noReasoningLevels') }}
+          </div>
+        </section>
+
+        <section
+          v-else-if="activePanel === 'advanced'"
+          class="desktop-model-selector__panel desktop-model-selector__panel--advanced"
+          role="menu"
+        >
+          <button class="desktop-model-selector__back" type="button" @click="openMainPanel">
+            <DesktopIcon :component="ChevronLeft16Regular" />
             <span>{{ t('desktop.chat.advanced') }}</span>
+          </button>
+          <span class="desktop-model-selector__divider" />
+          <button
+            class="desktop-model-selector__item"
+            :class="{ 'is-active': secondaryPanel === 'model' }"
+            type="button"
+            @click="toggleSecondaryPanel('model')"
+          >
+            <span>{{ t('desktop.chat.model') }}</span>
+            <strong>{{ modelLabel }}</strong>
             <DesktopIcon :component="ChevronRight16Regular" />
           </button>
-          <span class="desktop-model-selector__heading-status">
-            <Transition name="desktop-model-selector__status" mode="out-in">
-              <span
-                v-if="isMeterDragging"
-                key="reasoning-level"
-                class="desktop-model-selector__dragging-effort"
-                :class="`is-${effortTransitionDirection}`"
-              >
-                <Transition :name="`desktop-model-selector__effort-${effortTransitionDirection}`">
-                  <span
-                    :key="displayedEffort ?? 'none'"
-                    class="desktop-model-selector__dragging-effort-label"
-                  >
-                    {{ displayedEffortLabel }}
-                  </span>
-                </Transition>
-              </span>
-              <button
-                v-else-if="supportsFastMode"
-                key="fast-toggle"
-                class="desktop-model-selector__fast-toggle"
-                :class="{ 'is-active': isFastMode }"
-                type="button"
-                role="switch"
-                :aria-checked="isFastMode"
-                :aria-label="t('desktop.chat.fastMode')"
-                @click="toggleFastMode"
-              >
-                <DesktopIcon :component="Flash20Filled" />
-              </button>
-            </Transition>
-          </span>
-        </div>
+          <button
+            v-if="reasoningLevelOptions.length"
+            class="desktop-model-selector__item"
+            :class="{ 'is-active': secondaryPanel === 'reasoning' }"
+            type="button"
+            @click="toggleSecondaryPanel('reasoning')"
+          >
+            <span>{{ t('desktop.chat.effort') }}</span>
+            <strong>{{ selectedEffortLabel }}{{ isEffortUnavailable ? ` (${t('common.unavailable')})` : '' }}</strong>
+            <DesktopIcon :component="ChevronRight16Regular" />
+          </button>
+          <button
+            v-if="supportsFastMode"
+            class="desktop-model-selector__item"
+            :class="{ 'is-fast': isFastMode }"
+            type="button"
+            role="menuitemcheckbox"
+            :aria-checked="isFastMode"
+            @click="toggleFastMode"
+          >
+            <span>{{ t('desktop.chat.speed') }}</span>
+            <strong>{{ t(isFastMode ? 'desktop.chat.fastMode' : 'desktop.chat.standardSpeed') }}</strong>
+            <DesktopIcon :component="Flash20Filled" />
+          </button>
+        </section>
 
-        <div v-if="reasoningLevelOptions.length" class="desktop-model-selector__spell">
-          <DesktopReasoningPicker
-            v-if="isEffortUnavailable"
-            :language="language"
-            :options="reasoningLevelOptions"
-            :selected-effort="selectedEffortValue"
-            @select="selectEffort"
-          />
-          <DesktopReasoningMeter
-            v-else
-            :label="t('desktop.chat.effort')"
-            :options="reasoningLevelOptions"
-            :selected-effort="selectedEffortValue"
-            @dragging="updateMeterDragging"
-            @preview="previewMeterEffort"
-            @select="selectMeterEffort"
-          />
-        </div>
-        <div v-else class="desktop-model-selector__no-reasoning">
-          {{ t('desktop.chat.noReasoningLevels') }}
-        </div>
-      </section>
+        <DesktopReasoningPicker
+          v-if="activePanel === 'advanced' && secondaryPanel === 'reasoning'"
+          :language="language"
+          :options="reasoningLevelOptions"
+          :selected-effort="selectedEffortValue"
+          @select="selectEffort"
+        />
 
-      <section
-        v-else-if="activePanel === 'advanced'"
-        class="desktop-model-selector__panel desktop-model-selector__panel--advanced"
-        role="menu"
-      >
-        <button class="desktop-model-selector__back" type="button" @click="openMainPanel">
-          <DesktopIcon :component="ChevronLeft16Regular" />
-          <span>{{ t('desktop.chat.advanced') }}</span>
-        </button>
-        <span class="desktop-model-selector__divider" />
-        <button
-          class="desktop-model-selector__item"
-          :class="{ 'is-active': secondaryPanel === 'model' }"
-          type="button"
-          @click="toggleSecondaryPanel('model')"
-        >
-          <span>{{ t('desktop.chat.model') }}</span>
-          <strong>{{ modelLabel }}</strong>
-          <DesktopIcon :component="ChevronRight16Regular" />
-        </button>
-        <button
-          v-if="reasoningLevelOptions.length"
-          class="desktop-model-selector__item"
-          :class="{ 'is-active': secondaryPanel === 'reasoning' }"
-          type="button"
-          @click="toggleSecondaryPanel('reasoning')"
-        >
-          <span>{{ t('desktop.chat.effort') }}</span>
-          <strong>{{ selectedEffortLabel }}{{ isEffortUnavailable ? ` (${t('common.unavailable')})` : '' }}</strong>
-          <DesktopIcon :component="ChevronRight16Regular" />
-        </button>
-        <button
-          v-if="supportsFastMode"
-          class="desktop-model-selector__item"
-          :class="{ 'is-fast': isFastMode }"
-          type="button"
-          role="menuitemcheckbox"
-          :aria-checked="isFastMode"
-          @click="toggleFastMode"
-        >
-          <span>{{ t('desktop.chat.speed') }}</span>
-          <strong>{{ t(isFastMode ? 'desktop.chat.fastMode' : 'desktop.chat.standardSpeed') }}</strong>
-          <DesktopIcon :component="Flash20Filled" />
-        </button>
-      </section>
-
-      <DesktopReasoningPicker
-        v-if="activePanel === 'advanced' && secondaryPanel === 'reasoning'"
-        :language="language"
-        :options="reasoningLevelOptions"
-        :selected-effort="selectedEffortValue"
-        @select="selectEffort"
-      />
-
-      <DesktopModelPicker
-        v-else-if="activePanel === 'advanced' && secondaryPanel === 'model'"
-        :language="language"
-        :models="models"
-        :providers="providers"
-        :selected-model-id="selectedModelId"
-        @select="selectModel"
-      />
-    </div>
+        <DesktopModelPicker
+          v-else-if="activePanel === 'advanced' && secondaryPanel === 'model'"
+          :language="language"
+          :models="models"
+          :providers="providers"
+          :selected-model-id="selectedModelId"
+          @select="selectModel"
+        />
+      </div>
+    </NPopover>
   </div>
 </template>
 
 <style scoped lang="scss">
 .desktop-model-selector {
-  --desktop-model-popover-radius: var(--buddy-menu-radius);
-
   position: relative;
   min-width: 0;
 }
@@ -397,10 +409,8 @@ const {
 }
 
 .desktop-model-selector__popover {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 0.65rem);
-  z-index: 32;
+  --desktop-model-popover-radius: var(--buddy-menu-radius);
+
   display: flex;
   max-width: calc(100vw - 3rem);
   flex-direction: row-reverse;
@@ -408,10 +418,6 @@ const {
   gap: 0.5rem;
 
   &.is-bottom-start {
-    top: calc(100% + 0.55rem);
-    right: auto;
-    bottom: auto;
-    left: 0;
     flex-direction: row;
     align-items: flex-start;
   }
