@@ -4,8 +4,8 @@ import type { ApplicationEvents } from '../../shared/observability/ApplicationEv
 import type { BuddySessionExtensionServices } from './agent/extensions/createBuddySessionExtensions'
 import type { ReusableBuddySession } from './agent/sessions/ReusableBuddySession'
 import type { AutomationClock } from './automations/AutomationScheduleEvaluator'
-
 import type { BuddyRuntime } from './BuddyRuntime'
+
 import type { RunEventLogPort } from './events/RunEventPorts'
 import type { BuddyServiceRpcServer } from './rpc/BuddyServiceRpcServer'
 import type { BuddyServiceErrorCode } from './rpc/runtimeRequest'
@@ -17,6 +17,7 @@ import { resolveWindowsPowerShell } from '../../platform/windows/powerShell'
 import { automationNotifications } from '../../shared/automation/automationApi'
 import { ServiceHost } from '../../shared/lifecycle/ServiceHost'
 import { ApplicationEvents as EventPublisher } from '../../shared/observability/ApplicationEvents'
+import { openExternalResultSchema } from '../../shared/runtime/credentialProtocol'
 import { PiEventBridge } from './agent/events/PiEventBridge'
 import { BuddyAgentRunner } from './agent/execution/BuddyAgentRunner'
 import { BuddyRunExecutionPlanner } from './agent/execution/BuddyRunExecutionPlanner'
@@ -277,6 +278,11 @@ export async function startBuddyService(
     const connectorService = await host.start('runtime.connectors', ({ defer }) => {
       const service = new McpConnectorService({
         connectors: connectorsRepository,
+        openExternal: async (url) => {
+          const result = openExternalResultSchema.parse(await options.rpc.request('host.openExternal', { url }))
+          if (!result.ok)
+            throw new Error('MCP authorization page is unavailable')
+        },
         invalidateSessions: () => sessions.invalidateAll(),
         notify: (event) => {
           record({ event: event.type, level: event.code ? 'warn' : 'info', component: 'runtime.connectors', connectorId: event.connectorId, errorCode: event.code })
@@ -285,6 +291,7 @@ export async function startBuddyService(
         secrets: new HostConnectorSecretStore(options.rpc),
       })
       defer(() => service.close())
+      service.start()
       return service
     })
     const skillService = await host.start('runtime.skills', async ({ defer }) => {
@@ -368,6 +375,7 @@ export async function startBuddyService(
       },
     })
     const sessionExtensionServices: BuddySessionExtensionServices = {
+      prepareForRun: signal => connectorService.prepareForRun(signal),
       shellSandbox: await host.start('runtime.shell_sandbox', ({ defer }) => {
         const sandbox = new ShellSandboxClient(options.rpc)
         defer(() => sandbox.dispose())

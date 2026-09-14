@@ -17,6 +17,8 @@ export default {
   'approvalAction.approveForTurn': 'Allow for this turn',
   'approvalAction.deny': 'Deny',
   'desktop.approval.allow': 'Allow this operation',
+  'desktop.approval.argumentNames': 'Parameter names',
+  'desktop.approval.noArguments': 'No parameters',
   'desktop.approval.authorizationBoundary': 'Authorized boundary',
   'desktop.approval.browser.action': 'Trigger',
   'desktop.approval.browser.action.click': 'Click',

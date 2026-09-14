@@ -1,23 +1,21 @@
 import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
+import type { CallToolResult, Progress } from '@modelcontextprotocol/client'
 import type { TSchema } from 'typebox'
 import type { BuddyToolClassification } from '../../approvals/toolClassification'
 import type { McpRemoteTool } from './McpClientSession'
-import { Buffer } from 'node:buffer'
+import type { McpResultWriter } from './mcpToolResults'
+import { createHash } from 'node:crypto'
 import { defineTool } from '@earendil-works/pi-coding-agent'
-
-const MAX_DESCRIPTION_LENGTH = 2 * 1024
-const MAX_INPUT_SCHEMA_BYTES = 64 * 1024
-const MAX_RESULT_LENGTH = 64 * 1024
-
-export interface McpToolSession {
-  callTool: (name: string, arguments_: unknown, signal?: AbortSignal) => Promise<unknown>
-}
+import { mcpErrorCode } from './mcpErrors'
+import { normalizeMcpResult } from './mcpToolResults'
 
 export interface CreateMcpToolsOptions {
+  serverId: string
   serverName: string
-  session: McpToolSession
+  callTool: (tool: McpRemoteTool, arguments_: unknown, signal?: AbortSignal, onProgress?: (progress: Progress) => void) => Promise<CallToolResult>
   tools: readonly McpRemoteTool[]
   trusted: boolean
+  writeResult?: McpResultWriter
 }
 
 export interface McpToolsResult {
@@ -26,9 +24,14 @@ export interface McpToolsResult {
   tools: ToolDefinition[]
 }
 
-interface McpToolDetails {
+export interface McpToolDetails {
   code?: string
+  connector: string
   connectorTool: string
+  artifactIds: string[]
+  isError?: boolean
+  progress?: number
+  total?: number
 }
 
 export function createMcpTools(options: CreateMcpToolsOptions): McpToolsResult {
@@ -36,154 +39,58 @@ export function createMcpTools(options: CreateMcpToolsOptions): McpToolsResult {
   const diagnostics: McpToolsResult['diagnostics'] = []
   const tools: ToolDefinition[] = []
   const names = new Set<string>()
-
   for (const remoteTool of options.tools) {
-    const name = createMcpToolName(options.serverName, remoteTool.name)
-    if (names.has(name) || !isAllowedInputSchema(remoteTool.inputSchema)) {
-      diagnostics.push({
-        code: 'MCP_TOOL_INVALID',
-        message: 'A Lexora Buddy connector tool has invalid or conflicting metadata',
-      })
+    const name = createMcpToolName(options.serverId, remoteTool.name)
+    if (names.has(name)) {
+      diagnostics.push({ code: 'MCP_TOOL_INVALID', message: 'MCP tool names conflict' })
       continue
     }
     names.add(name)
-    tools.push(createToolDefinition(name, remoteTool, options.session))
-    classifications.set(name, classifyTool(options.trusted, remoteTool))
+    tools.push(defineTool<TSchema, McpToolDetails>({
+      name,
+      label: `${options.serverName} · ${remoteTool.title ?? remoteTool.name}`,
+      description: `${options.serverName}: ${remoteTool.description ?? remoteTool.name}`.slice(0, 2048),
+      parameters: remoteTool.inputSchema as TSchema,
+      execute: async (_toolCallId, parameters, signal, onUpdate, context) => {
+        const details: McpToolDetails = { connector: options.serverName, connectorTool: remoteTool.name, artifactIds: [] }
+        let lastProgress = 0
+        try {
+          signal?.throwIfAborted()
+          onUpdate?.({ content: [{ type: 'text', text: 'MCP tool is running' }], details })
+          const result = await options.callTool(remoteTool, parameters, signal, (progress) => {
+            if (!onUpdate || signal?.aborted || Date.now() - lastProgress < 250)
+              return
+            lastProgress = Date.now()
+            onUpdate({ content: [{ type: 'text', text: progress.message?.slice(0, 512) ?? 'MCP tool is running' }], details: { ...details, progress: progress.progress, total: progress.total } })
+          })
+          signal?.throwIfAborted()
+          const normalized = await normalizeMcpResult(result, options.writeResult, signal, context.model?.input.includes('image') ?? false)
+          return { content: normalized.content, details: { ...details, artifactIds: normalized.artifactIds, isError: normalized.isError }, isError: normalized.isError }
+        }
+        catch (error) {
+          signal?.throwIfAborted()
+          const code = mcpErrorCode(error, 'MCP_TOOL_FAILED')
+          return { content: [{ type: 'text', text: `MCP tool failed: ${code}` }], details: { ...details, code, isError: true }, isError: true }
+        }
+      },
+    }))
+    classifications.set(name, classifyTool(options.trusted, remoteTool, options.serverName))
   }
   return { classifications, diagnostics, tools }
 }
 
-export function createMcpToolName(serverName: string, toolName: string): string {
-  return `mcp__${normalizeName(serverName)}__${normalizeName(toolName)}`
+export function createMcpToolName(serverId: string, toolName: string): string {
+  const hash = (value: string) => createHash('sha256').update(value).digest('hex').slice(0, 12)
+  const readable = toolName.replaceAll(/\W/g, '_').slice(0, 27) || 'tool'
+  return `mcp__${hash(serverId)}__${readable}_${hash(toolName)}`
 }
 
-function createToolDefinition(
-  name: string,
-  remoteTool: McpRemoteTool,
-  session: McpToolSession,
-): ToolDefinition {
-  return defineTool<TSchema, McpToolDetails>({
-    description: sanitizeDescription(remoteTool.description),
-    execute: async (_toolCallId, parameters, signal) => {
-      try {
-        const result = await session.callTool(remoteTool.name, parameters, signal)
-        const normalized = normalizeMcpResult(result)
-        return {
-          content: [{ type: 'text', text: normalized.text }],
-          details: { connectorTool: name },
-          isError: normalized.isError,
-        }
-      }
-      catch {
-        return {
-          content: [{ type: 'text', text: 'Lexora Buddy connector tool failed' }],
-          details: { code: 'MCP_TOOL_FAILED', connectorTool: name },
-          isError: true,
-        }
-      }
-    },
-    label: name,
-    name,
-    parameters: remoteTool.inputSchema as TSchema,
-  })
-}
-
-function classifyTool(
-  trusted: boolean,
-  tool: McpRemoteTool,
-): BuddyToolClassification {
-  const readOnly = trusted
-    && tool.annotations?.readOnlyHint === true
-    && tool.annotations.destructiveHint !== true
-    && tool.annotations.openWorldHint !== true
-  if (readOnly && trusted) {
-    return {
-      access: 'read',
-    }
-  }
+function classifyTool(trusted: boolean, tool: McpRemoteTool, serverName: string): BuddyToolClassification {
+  if (trusted && tool.annotations?.readOnlyHint === true && tool.annotations.openWorldHint === false)
+    return { access: 'read' }
   return {
     access: 'network',
-    approval: { kind: 'mcp', summary: 'Use a connected external tool' },
-    forceAsk: tool.annotations?.destructiveHint === true,
+    approval: { kind: 'mcp', summary: `${serverName}: ${tool.title ?? tool.name}` },
+    forceAsk: !trusted || (tool.annotations?.readOnlyHint !== true && tool.annotations?.destructiveHint !== false),
   }
-}
-
-function isAllowedInputSchema(schema: McpRemoteTool['inputSchema']): boolean {
-  try {
-    return schema.type === 'object'
-      && Buffer.byteLength(JSON.stringify(schema)) <= MAX_INPUT_SCHEMA_BYTES
-  }
-  catch {
-    return false
-  }
-}
-
-function sanitizeDescription(value: string | undefined): string {
-  const description = value
-    ? [...value].map(character => isControlCharacter(character) ? ' ' : character).join('').trim()
-    : undefined
-  return (description || 'Use a tool provided by a Lexora Buddy connector')
-    .slice(0, MAX_DESCRIPTION_LENGTH)
-}
-
-function isControlCharacter(value: string): boolean {
-  const code = value.codePointAt(0) ?? 0
-  return code < 32 || code === 127
-}
-
-function normalizeMcpResult(value: unknown): { isError: boolean, text: string } {
-  if (!isRecord(value))
-    return { isError: true, text: 'Lexora Buddy connector returned an invalid result' }
-  const parts: string[] = []
-  if (Array.isArray(value.content)) {
-    for (const content of value.content) {
-      if (!isRecord(content))
-        continue
-      if (content.type === 'text' && typeof content.text === 'string')
-        parts.push(content.text)
-      else if (content.type === 'resource' && isRecord(content.resource) && typeof content.resource.text === 'string')
-        parts.push(content.resource.text)
-      else if (content.type === 'resource_link' && typeof content.name === 'string')
-        parts.push(`[Resource: ${content.name}]`)
-      else if (content.type === 'image' || content.type === 'audio')
-        parts.push(`[${String(content.type)} omitted]`)
-    }
-  }
-  if ('structuredContent' in value)
-    parts.push(safeJson(value.structuredContent))
-  const text = redactSecrets(parts.filter(Boolean).join('\n'))
-    .slice(0, MAX_RESULT_LENGTH)
-  return {
-    isError: value.isError === true,
-    text: text || 'Connector tool completed without text output',
-  }
-}
-
-function safeJson(value: unknown): string {
-  try {
-    return JSON.stringify(value, (key, entry) => (
-      /authorization|api[-_]?key|secret|token/i.test(key) ? '[REDACTED]' : entry
-    ))
-  }
-  catch {
-    return '[Unserializable connector output]'
-  }
-}
-
-function redactSecrets(value: string): string {
-  return value
-    .replaceAll(/\bBearer\s+[\w.~+/=-]+/gi, 'Bearer [REDACTED]')
-    .replaceAll(/((?:authorization|api[-_]?key|secret|token)\s*[:=]\s*)[^\s,;]+/gi, '$1[REDACTED]')
-}
-
-function normalizeName(value: string): string {
-  const normalized = value.toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, '_')
-    .replaceAll(/^_+|_+$/g, '')
-    .slice(0, 48)
-  return normalized || 'unnamed'
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }

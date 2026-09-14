@@ -3,7 +3,7 @@ import type { BuddyCapability, BuddyCapabilityContext, BuddyCapabilityFactory } 
 import type { ArtifactService } from './artifacts/ArtifactService'
 import type { CreateAutomationToolOptions } from './automations/createAutomationTool'
 import type { BrowserCapabilityHost } from './browser/BrowserCapabilityService'
-import type { BuddyMcpTools } from './connectors/mcp/McpConnectorService'
+import type { McpConnectorService } from './connectors/mcp/McpConnectorService'
 import type { ImageGenerationGateway } from './images/ImageGenerationGateway'
 import type { ImageGenerationServiceOptions } from './images/ImageGenerationService'
 import type { ImageTransformService } from './images/ImageTransformService'
@@ -13,6 +13,7 @@ import { createOutputPresentationCapability } from './artifacts/outputPresentati
 import { createAutomationCapability } from './automations/automationExtension'
 import { createBrowserCapability } from './browser/browserExtension'
 import { createMcpCapability } from './connectors/mcp/mcpExtension'
+import { createMcpResultWriter } from './connectors/mcp/McpResultStore'
 import { createImageGenerationCapability } from './images/imageGenerationExtension'
 import { ImageGenerationService } from './images/ImageGenerationService'
 import { createImageTransformCapability } from './images/imageTransformExtension'
@@ -27,7 +28,7 @@ export interface BuddyCapabilityServices {
   attachmentService: ImageGenerationServiceOptions['attachmentService']
   automationService: CreateAutomationToolOptions['service']
   browserHost: BrowserCapabilityHost
-  connectorService: { getTools: (signal?: AbortSignal) => Promise<BuddyMcpTools> }
+  connectorService: Pick<McpConnectorService, 'getTools'>
   imageGenerationGateway: ImageGenerationGateway
   imageTransformService: Pick<ImageTransformService, 'removeChroma'>
   onAutomationChanged: (automationId: string) => void
@@ -52,7 +53,7 @@ export function createBuddyCapabilityFactory(
   const supported = platform.features.map(id => platformFactories[id]())
   return async (context) => {
     context.signal.throwIfAborted()
-    const mcp = await services.connectorService.getTools(context.signal)
+    const mcp = services.connectorService.getTools(context.signal, context.executionProfile === 'read_only' ? undefined : createMcpResultWriter({ ...context, artifactService: services.artifactService }))
     context.signal.throwIfAborted()
     const capabilities = [
       createMcpCapability(mcp),

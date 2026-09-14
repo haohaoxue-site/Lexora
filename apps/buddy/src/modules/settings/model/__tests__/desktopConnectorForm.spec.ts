@@ -10,7 +10,6 @@ describe('createConnectorSavePlan', () => {
       args: 'server.mjs\n--stdio',
       bearerToken: '',
       command: 'node',
-      cwd: '/workspace',
       env: 'GITHUB_PERSONAL_ACCESS_TOKEN=redacted\nCUSTOM_TOKEN= value=with=equals ',
       headers: '',
       id: 'github',
@@ -23,7 +22,7 @@ describe('createConnectorSavePlan', () => {
       config: {
         args: ['server.mjs', '--stdio'],
         command: 'node',
-        cwd: '/workspace',
+        cwd: null,
         enabled: false,
         id: 'github',
         name: 'GitHub',
@@ -46,6 +45,7 @@ describe('createConnectorSavePlan', () => {
     const connector: LocalConnector = {
       args: ['server.mjs'],
       command: 'node',
+      runtime: { authorization: null, status: 'ready', errorCode: null, toolCount: 0, updatedAt: null },
       credentialConfigured: true,
       cwd: '/workspace',
       enabled: true,
@@ -58,7 +58,6 @@ describe('createConnectorSavePlan', () => {
       args: 'server.mjs',
       bearerToken: '',
       command: 'node',
-      cwd: '/workspace',
       env: '',
       headers: '',
       id: 'local',
@@ -67,9 +66,10 @@ describe('createConnectorSavePlan', () => {
       url: '',
     }
 
-    expect(createConnectorSavePlan(base, connector).config.enabled).toBe(true)
-    expect(createConnectorSavePlan({ ...base, command: 'bun' }, connector).config.enabled)
-      .toBe(false)
+    const unchanged = createConnectorSavePlan(base, connector).config
+    expect(unchanged.enabled).toBe(true)
+    expect(unchanged.transport === 'stdio' && unchanged.cwd).toBe('/workspace')
+    expect(createConnectorSavePlan({ ...base, command: 'bun' }, connector).config.enabled).toBe(false)
   })
 
   it('keeps HTTP bearer and header credentials as separate protocol fields', () => {
@@ -77,7 +77,6 @@ describe('createConnectorSavePlan', () => {
       args: '',
       bearerToken: 'redacted-bearer',
       command: '',
-      cwd: '',
       env: '',
       headers: 'X-API-Key=redacted-key\nX-Tenant=personal',
       id: 'remote',
@@ -101,6 +100,7 @@ describe('createConnectorSavePlan', () => {
 
   it('keeps blank credentials only while the connector target is unchanged', () => {
     const connector: LocalConnector = {
+      runtime: { authorization: null, status: 'ready', errorCode: null, toolCount: 0, updatedAt: null },
       credentialConfigured: true,
       enabled: true,
       id: 'remote',
@@ -113,7 +113,6 @@ describe('createConnectorSavePlan', () => {
       args: '',
       bearerToken: '',
       command: '',
-      cwd: '',
       env: '',
       headers: '',
       id: 'remote',
@@ -134,7 +133,6 @@ describe('createConnectorSavePlan', () => {
       args: '',
       bearerToken: '',
       command: '',
-      cwd: '',
       env: '',
       headers: 'Invalid Header=value',
       id: 'remote',

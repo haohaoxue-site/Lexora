@@ -13,14 +13,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PermissionEngine } from '../../../permissions/PermissionEngine'
 import { createConnectorRepository } from '../../../storage/connectorRepository'
 import { openBuddyDatabase } from '../../../storage/database'
+import { createMcpToolName } from '../createMcpTools'
 import { McpConnectorService } from '../McpConnectorService'
 import { classifyMcpTool } from '../mcpToolContract'
 
+const services: McpConnectorService[] = []
 const databases: DatabaseSync[] = []
 const directories: string[] = []
 const fixtureServer = fileURLToPath(new URL('./fixtures/stdio-server.mjs', import.meta.url))
 
 afterEach(async () => {
+  await Promise.all(services.splice(0).map(service => service.close()))
   for (const database of databases.splice(0))
     database.close()
   await Promise.all(directories.splice(0).map(path => rm(path, { force: true, recursive: true })))
@@ -34,12 +37,14 @@ describe('mcpConnectorService', () => {
       .rejects
       .toMatchObject({ code: 'MCP_CONNECTOR_TRUST_REQUIRED' })
     await fixture.service.trust('fixture')
+    await fixture.service.trust('fixture')
     await fixture.service.setEnabled('fixture', true)
+    await fixture.service.test('fixture')
 
     const result = await fixture.service.getTools()
     expect(result.tools.map(tool => tool.name)).toEqual([
-      'mcp__local_fixture__echo_read',
-      'mcp__local_fixture__write_remote',
+      createMcpToolName('fixture', 'echo_read'),
+      createMcpToolName('fixture', 'write_remote'),
     ])
     const echo = result.tools[0]
     if (!echo)
@@ -69,7 +74,7 @@ describe('mcpConnectorService', () => {
       profile: 'workspace_write',
       grants: [{ canonicalRoot: root, grantId: 'workspace-1', kind: 'workspace' as const, root }],
       ...readClassification,
-      toolName: 'mcp__local_fixture__echo_read',
+      toolName: createMcpToolName('fixture', 'echo_read'),
     })).resolves.toEqual({ type: 'allow' })
     await expect(policy.decide({
       approvalPolicy: 'policy',
@@ -80,7 +85,7 @@ describe('mcpConnectorService', () => {
       profile: 'workspace_write',
       grants: [{ canonicalRoot: root, grantId: 'workspace-1', kind: 'workspace' as const, root }],
       ...writeClassification,
-      toolName: 'mcp__local_fixture__write_remote',
+      toolName: createMcpToolName('fixture', 'write_remote'),
     })).resolves.toMatchObject({ kind: 'mcp', type: 'ask' })
     expect(fixture.secrets.values.size).toBe(0)
     await fixture.service.close()
@@ -94,7 +99,9 @@ describe('mcpConnectorService', () => {
       env: { FIXTURE_TOKEN: 'secret-value' },
       type: 'stdio',
     })
+    await fixture.service.trust('fixture')
     await fixture.service.setEnabled('fixture', true)
+    await fixture.service.test('fixture')
     const tools = await fixture.service.getTools()
     expect(tools.tools).toHaveLength(2)
     expect(JSON.stringify(fixture.service.list())).not.toContain('secret-value')
@@ -110,22 +117,14 @@ describe('mcpConnectorService', () => {
     await fixture.service.close()
   })
 
-  it('stops reconnecting after the configured attempt limit', async () => {
+  it('reports a missing command without letting context previews retry it', async () => {
     const fixture = await createFixture(2)
-    await fixture.service.upsert({
-      ...stdioConfig(false),
-      command: '/lexora/does-not-exist',
-    })
+    await fixture.service.upsert({ ...stdioConfig(false), command: '/lexora/does-not-exist' })
     await fixture.service.trust('fixture')
-    await fixture.service.setEnabled('fixture', true)
-
-    const first = await fixture.service.getTools()
-    const second = await fixture.service.getTools()
-    const third = await fixture.service.getTools()
-    expect(first.diagnostics[0]?.code).toBe('MCP_SERVER_UNAVAILABLE')
-    expect(second.diagnostics[0]?.code).toBe('MCP_RECONNECT_LIMIT_REACHED')
-    expect(third.diagnostics[0]?.code).toBe('MCP_RECONNECT_LIMIT_REACHED')
-    await fixture.service.close()
+    expect(await fixture.service.test('fixture')).toMatchObject({ errorCode: 'MCP_COMMAND_NOT_FOUND' })
+    expect(fixture.service.getTools().tools).toEqual([])
+    expect(fixture.service.getTools().tools).toEqual([])
+    expect(fixture.service.state('fixture').errorCode).toBe('MCP_COMMAND_NOT_FOUND')
   })
 
   it('rejects plaintext secret fields and non-local insecure HTTP URLs', async () => {
@@ -149,7 +148,9 @@ describe('mcpConnectorService', () => {
     await fixture.service.upsert(stdioConfig(false))
     await fixture.service.trust('fixture')
     await fixture.service.saveCredential('fixture', { env: { TOKEN: 'secret' }, type: 'stdio' })
+    await fixture.service.trust('fixture')
     await fixture.service.setEnabled('fixture', true)
+    await fixture.service.test('fixture')
     fixture.secrets.read.mockClear()
 
     const [first, second] = await Promise.all([
@@ -159,7 +160,7 @@ describe('mcpConnectorService', () => {
 
     expect(first.tools).toHaveLength(2)
     expect(second.tools).toHaveLength(2)
-    expect(fixture.secrets.read).toHaveBeenCalledOnce()
+    expect(fixture.secrets.read).not.toHaveBeenCalled()
     await fixture.service.close()
   })
 
@@ -277,7 +278,7 @@ function stdioConfig(enabled: boolean) {
 function httpConfig(url: string) {
   return {
     credentialRef: null,
-    enabled: true,
+    enabled: false,
     id: 'remote',
     name: 'Remote',
     transport: 'streamable-http' as const,
@@ -310,6 +311,7 @@ async function createFixture(maxReconnectAttempts?: number) {
       },
     },
   })
+  services.push(service)
   return {
     events,
     invalidateSessions,
@@ -336,6 +338,9 @@ function createCredentialFailureFixture() {
   }
   const service = new McpConnectorService({
     connectors: {
+      readCatalog: () => null,
+      saveCatalog: () => {},
+      clearCatalog: () => {},
       findById: () => record,
       list: () => [record],
       remove: () => false,
@@ -372,7 +377,7 @@ function createAtomicSaveFailureFixture() {
     createdAt: '2026-08-14T00:00:00.000Z',
     credentialRef: 'remote',
     cwd: null,
-    enabled: true,
+    enabled: false,
     id: 'remote',
     name: 'Remote',
     transport: 'streamable-http' as const,
@@ -382,6 +387,9 @@ function createAtomicSaveFailureFixture() {
   }
   const service = new McpConnectorService({
     connectors: {
+      readCatalog: () => null,
+      saveCatalog: () => {},
+      clearCatalog: () => {},
       findById: () => record,
       list: () => [record],
       remove: () => false,

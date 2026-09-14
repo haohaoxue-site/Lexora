@@ -101,6 +101,7 @@ provide(settingsContextKey, {
   providerSettings: stores.modelProviders,
   ready,
   webSettings: capabilities.webSettings,
+  mcpSettings: capabilities.mcpSettings,
   openTask: navigation.openTask,
 })
 provide(skillsContextKey, {

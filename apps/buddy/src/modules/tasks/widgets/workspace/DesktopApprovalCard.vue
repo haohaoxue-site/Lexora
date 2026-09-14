@@ -97,6 +97,7 @@ const browserAction = computed(() => {
 const approvalOperation = computed(() => (
   systemEffect.value
   || browserEffect.value
+  || (props.approval.kind === 'mcp' && props.approval.summary.trim())
   || t(`desktop.approval.kind.${props.approval.kind}`)
 ))
 const approvalTitle = computed(() => t('desktop.approval.title', {
@@ -336,6 +337,17 @@ const turnConfirmationButtonProps = { type: 'error' } as const
         {{ grantNotice }}
       </p>
     </div>
+    <section
+      v-else-if="approval.kind === 'mcp' && review?.card === 'arguments'"
+      class="desktop-approval-card__details desktop-approval-card__review"
+    >
+      <dl>
+        <div>
+          <dt>{{ t('desktop.approval.argumentNames') }}</dt>
+          <dd>{{ review.argumentNames.join(', ') || t('desktop.approval.noArguments') }}</dd>
+        </div>
+      </dl>
+    </section>
     <p v-else-if="review?.card === 'arguments'" class="desktop-approval-card__review">
       {{ review.argumentNames.join(', ') }}
     </p>
@@ -440,6 +452,7 @@ const turnConfirmationButtonProps = { type: 'error' } as const
   font-size: 0.84rem;
   font-weight: 600;
   line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .desktop-approval-card__description {

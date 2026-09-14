@@ -9,6 +9,7 @@ import {
   DataHistogram20Regular,
   DocumentTextClock20Regular,
   Globe20Regular,
+  PlugConnected20Regular,
 } from '@vicons/fluent'
 import { computed } from 'vue'
 
@@ -30,6 +31,7 @@ const { t } = useBuddyI18n(() => props.language)
 const categories = [
   { icon: Apps20Regular, key: 'app' as const },
   { icon: Bot20Regular, key: 'models' as const },
+  { icon: PlugConnected20Regular, key: 'mcp' as const },
   { icon: SkillIcon, key: 'skills' as const },
   { icon: Globe20Regular, key: 'web' as const },
   { icon: AnimalCat20Regular, key: 'pet' as const },

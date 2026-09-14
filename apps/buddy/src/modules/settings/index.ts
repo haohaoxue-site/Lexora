@@ -4,6 +4,8 @@ export type { DesktopDataSettingsCapability } from './state/desktopDataSettingsC
 export { createDesktopDataSettingsCapability } from './state/desktopDataSettingsCapability'
 export type { ApplicationSettingsStore } from './state/useApplicationSettingsStore'
 export { useApplicationSettingsStore } from './state/useApplicationSettingsStore'
+export { useMcpSettingsCapability } from './state/useMcpSettingsCapability'
+export type { McpSettingsCapability } from './state/useMcpSettingsCapability'
 export { useUsageStore } from './state/useUsageStore'
 export type { WebSettingsCapability } from './state/useWebSettingsCapability'
 export { useWebSettingsCapability } from './state/useWebSettingsCapability'

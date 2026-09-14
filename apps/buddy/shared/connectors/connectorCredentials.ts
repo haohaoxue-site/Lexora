@@ -17,9 +17,30 @@ export const httpConnectorCredentialSchema = z.object({
   type: z.literal('http'),
 }).strict()
 
-export const connectorCredentialSchema = z.discriminatedUnion('type', [
+export const editableConnectorCredentialSchema = z.discriminatedUnion('type', [
   stdioConnectorCredentialSchema,
   httpConnectorCredentialSchema,
 ])
 
+export const oauthConnectorCredentialSchema = z.object({
+  type: z.literal('oauth'),
+  redirectUrl: z.url(),
+  tokens: z.looseObject({
+    access_token: z.string(),
+    token_type: z.string(),
+    issuer: z.string(),
+    refresh_token: z.string().optional(),
+    expires_in: z.number().optional(),
+    scope: z.string().optional(),
+  }).nullable(),
+  clients: z.record(z.string(), z.looseObject({ client_id: z.string(), issuer: z.string() })),
+}).strict()
+
+export const connectorCredentialSchema = z.discriminatedUnion('type', [
+  ...editableConnectorCredentialSchema.options,
+  oauthConnectorCredentialSchema,
+])
+
 export type ConnectorCredential = z.infer<typeof connectorCredentialSchema>
+export type EditableConnectorCredential = z.infer<typeof editableConnectorCredentialSchema>
+export type OAuthConnectorCredential = z.infer<typeof oauthConnectorCredentialSchema>

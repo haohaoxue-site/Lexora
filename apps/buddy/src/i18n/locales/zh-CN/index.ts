@@ -4,6 +4,7 @@ import approvals from './approvals'
 import automations from './automations'
 import chat from './chat'
 import diagnostics from './diagnostics'
+import mcp from './mcp'
 import models from './models'
 import pet from './pet'
 import settings from './settings'
@@ -18,6 +19,7 @@ export default {
   ...automations,
   ...chat,
   ...diagnostics,
+  ...mcp,
   ...models,
   ...pet,
   ...settings,

@@ -55,7 +55,7 @@
     "@earendil-works/pi-ai": "^0.85.1",
     "@earendil-works/pi-coding-agent": "^0.85.1",
     "@js-temporal/polyfill": "^0.5.1",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/client": "2.0.0",
     "@mozilla/readability": "^0.6.0",
     "@silvia-odwyer/photon-node": "0.3.4",
     "@tiptap/core": "^3.22.3",
@@ -85,6 +85,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@types/node": "catalog:",
     "@types/turndown": "^5.0.6",
     "@vitejs/plugin-vue": "^6.0.6",

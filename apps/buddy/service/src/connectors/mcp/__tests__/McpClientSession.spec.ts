@@ -11,7 +11,8 @@ const sdk = vi.hoisted(() => ({
   }>,
 }))
 
-vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
+vi.mock('@modelcontextprotocol/client', async importOriginal => ({
+  ...await importOriginal<typeof import('@modelcontextprotocol/client')>(),
   Client: class {
     close = vi.fn(async () => {})
     onclose?: () => void

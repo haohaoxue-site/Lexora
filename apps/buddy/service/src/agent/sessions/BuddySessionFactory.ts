@@ -87,18 +87,21 @@ export class BuddySessionFactory {
       modelId: run.model,
       providerId: run.provider,
     })
-    const extensions = await events.operation('session.resources', () => createBuddySessionExtensions({
-      approvalPolicy: blueprint.approvalPolicy,
-      canonicalRoot: blueprint.canonicalRoot,
-      conversationId: blueprint.conversationId,
-      executionProfile: blueprint.executionProfile,
-      grants: blueprint.grants,
-      skillReadRoots: blueprint.resources.skillReadRoots,
-      sessionMode: blueprint.sessionMode,
-      signal: input.signal,
-      spaceId: blueprint.space?.id ?? null,
-      services: this.#options.services,
-    }))
+    const extensions = await events.operation('session.resources', async () => {
+      await this.#options.services.prepareForRun?.(input.signal)
+      return createBuddySessionExtensions({
+        approvalPolicy: blueprint.approvalPolicy,
+        canonicalRoot: blueprint.canonicalRoot,
+        conversationId: blueprint.conversationId,
+        executionProfile: blueprint.executionProfile,
+        grants: blueprint.grants,
+        skillReadRoots: blueprint.resources.skillReadRoots,
+        sessionMode: blueprint.sessionMode,
+        signal: input.signal,
+        spaceId: blueprint.space?.id ?? null,
+        services: this.#options.services,
+      })
+    })
     const tree = await this.#options.tree.open(run, blueprint.canonicalRoot, selected.model)
     const session = await createBuddySession({
       sessionManager: tree.manager,

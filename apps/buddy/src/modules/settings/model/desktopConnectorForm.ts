@@ -7,7 +7,6 @@ export interface DesktopConnectorFormValue {
   args: string
   bearerToken: string
   command: string
-  cwd: string
   env: string
   headers: string
   id: string
@@ -29,14 +28,14 @@ export function createConnectorSavePlan(
   const name = form.name.trim()
 
   if (form.transport === 'stdio') {
-    const args = splitLines(form.args)
+    const args = parseArguments(form.args)
     const command = form.command.trim()
-    const cwd = form.cwd.trim() || null
+    const cwd = existing?.transport === 'stdio' ? existing.cwd : null
     const config: LocalConnectorConfig = {
       args,
       command,
       cwd,
-      enabled: preservesEnabledStdioTarget(existing, command, args, cwd),
+      enabled: !form.env.trim() && preservesEnabledStdioTarget(existing, command, args, cwd),
       id,
       name,
       transport: 'stdio',
@@ -62,7 +61,7 @@ export function createConnectorSavePlan(
       : null
 
   const config: LocalConnectorConfig = {
-    enabled: existing?.transport === 'streamable-http' ? existing.enabled : true,
+    enabled: existing?.transport === 'streamable-http' && existing.url === form.url.trim() ? existing.enabled : false,
     id,
     name,
     transport: 'streamable-http',
@@ -119,8 +118,13 @@ function preservesEnabledStdioTarget(
     && arraysEqual(existing.args, args)
 }
 
-function splitLines(value: string): string[] {
-  return value.split('\n').map(line => line.trim()).filter(Boolean)
+function parseArguments(value: string): string[] {
+  if (!value.trim().startsWith('['))
+    return value.split(/\r?\n/).filter(line => line.length > 0)
+  const parsed: unknown = JSON.parse(value)
+  if (!Array.isArray(parsed) || parsed.some(item => typeof item !== 'string'))
+    throw new Error('INVALID_ARGUMENTS')
+  return parsed
 }
 
 function parseEntries(value: string, keyPattern?: RegExp): Record<string, string> {

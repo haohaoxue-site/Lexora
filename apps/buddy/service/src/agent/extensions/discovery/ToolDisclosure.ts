@@ -35,6 +35,12 @@ export class ToolDisclosure {
     return [...this.#resident, ...this.#discovered].filter(name => this.#available(name, model))
   }
 
+  connectedTools(model: Model<Api> | undefined): { name: string, description: string }[] {
+    return [...this.#tools.values()]
+      .filter(tool => this.#policies.get(tool.name)?.group === 'mcp' && this.#available(tool.name, model))
+      .map(tool => ({ name: tool.name, description: tool.description.slice(0, 180) }))
+  }
+
   search(input: ToolSearchInput, model: Model<Api> | undefined): ToolSearchResult {
     const available = (name: string) => this.#available(name, model)
     const requested = input.toolNames ?? []
@@ -104,7 +110,7 @@ export class ToolDisclosure {
   #available(name: string, model: Model<Api> | undefined): boolean {
     return this.#tools.has(name)
       && (this.#resident.includes(name) || this.#policies.has(name))
-      && (this.#policies.get(name)?.available?.(model) ?? true)
+      && (this.#policies.get(name)?.available?.(model, name) ?? true)
   }
 }
 

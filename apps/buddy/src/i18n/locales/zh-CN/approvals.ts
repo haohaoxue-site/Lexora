@@ -11,6 +11,8 @@ export default {
   'approvalAction.approveForTurn': '本轮授权',
   'approvalAction.deny': '拒绝',
   'desktop.approval.allow': '允许本次操作',
+  'desktop.approval.argumentNames': '参数名称',
+  'desktop.approval.noArguments': '无参数',
   'desktop.approval.authorizationBoundary': '授权边界',
   'desktop.approval.browser.action': '触发方式',
   'desktop.approval.browser.action.click': '点击',
