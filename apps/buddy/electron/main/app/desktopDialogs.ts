@@ -2,9 +2,21 @@ import type { BrowserWindow, MessageBoxOptions } from 'electron'
 import type { LexoraConfig } from '../../shared/desktopApi'
 import type { LexoraConfigStore } from '../config/LexoraConfigStore'
 import type { DesktopEnvironment, DesktopQuitHost, DesktopQuitOptions } from './typing'
-import { dialog, ipcMain, Notification, shell } from 'electron'
+import { app, dialog, ipcMain, Notification, shell } from 'electron'
 import { translateDesktopNative } from '../desktopNativeI18n'
 import { confirmDraftFlushBeforeQuit, requestRendererDraftFlush } from '../rendererDraftLifecycle'
+import { describeDesktopStartupFailure } from './desktopStartupFailure'
+
+export async function showDesktopStartupFailure(error: unknown, language: LexoraConfig['desktop']['language'], environment?: DesktopEnvironment): Promise<void> {
+  const options = describeDesktopStartupFailure(error, language, environment?.diagnostics.launchId)
+  if (!app.isReady()) {
+    dialog.showErrorBox(options.message, options.detail ?? '')
+    return
+  }
+  const { response } = await dialog.showMessageBox({ ...options, ...(!environment ? { buttons: [translateDesktopNative(language, 'quit')] } : {}) })
+  if (response === 1 && environment)
+    await shell.openPath(environment.paths.logs)
+}
 
 export function confirmDesktopQuit(host: DesktopQuitHost, options: DesktopQuitOptions): Promise<boolean> {
   return confirmDraftFlushBeforeQuit(

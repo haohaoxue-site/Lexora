@@ -1,13 +1,11 @@
 import type { Event } from 'electron'
 import type { DesktopEnvironment } from './typing'
 import process from 'node:process'
-import { app, dialog, nativeTheme } from 'electron'
-import { PowerShellUnavailableError } from '../../../platform/windows/powerShell'
+import { app, nativeTheme } from 'electron'
 import { readDiagnosticErrorCode } from '../../../shared/diagnostics/applicationDiagnostic'
 import { ServiceHost } from '../../../shared/lifecycle/ServiceHost'
-import { translateDesktopNative } from '../desktopNativeI18n'
 import { resolveDesktopLaunchIntent } from '../startupIntent'
-import { confirmDesktopQuit, showBackgroundCloseNotice, showLegacyPowerShellNotice } from './desktopDialogs'
+import { confirmDesktopQuit, showBackgroundCloseNotice, showDesktopStartupFailure, showLegacyPowerShellNotice } from './desktopDialogs'
 import { DesktopIntegrations } from './DesktopIntegrations'
 import { createDesktopQuitLifecycle } from './desktopQuitLifecycle'
 import { DesktopRuntimeHost } from './DesktopRuntimeHost'
@@ -103,14 +101,18 @@ class DesktopApplication {
   }
 
   async handleStartupFailure(error: unknown): Promise<void> {
-    this.#environment.events.publish({ level: 'error', event: 'app.start_failed', errorCode: readDiagnosticErrorCode(error) })
-    if (error instanceof PowerShellUnavailableError)
-      dialog.showErrorBox('Lexora Buddy', translateDesktopNative(this.#runtime.language, 'powerShellUnavailable'))
+    this.#environment.startup.failed(error)
     try {
       await this.#dispose()
     }
     finally {
-      app.exit(1)
+      try {
+        if (!this.#environment.isSmokeTest)
+          await showDesktopStartupFailure(error, this.#runtime.language, this.#environment)
+      }
+      finally {
+        app.exit(1)
+      }
     }
   }
 
@@ -144,13 +146,27 @@ class DesktopApplication {
 }
 
 export function startDesktopApplication(): void {
-  const environment = prepareDesktopEnvironment()
-  if (!app.requestSingleInstanceLock()) {
-    app.quit()
-    return
+  let environment: DesktopEnvironment | undefined
+  try {
+    environment = prepareDesktopEnvironment()
+    if (!app.requestSingleInstanceLock()) {
+      app.quit()
+      return
+    }
+    environment.events.publish({ level: 'info', event: 'app.starting' })
+    const application = new DesktopApplication(environment)
+    application.bindEvents()
+    void application.start().catch(error => application.handleStartupFailure(error))
   }
-  environment.events.publish({ level: 'info', event: 'app.starting' })
-  const application = new DesktopApplication(environment)
-  application.bindEvents()
-  void application.start().catch(error => application.handleStartupFailure(error))
+  catch (error) {
+    environment?.startup.failed(error)
+    void showDesktopStartupFailure(error, 'zh-CN', environment).finally(async () => {
+      try {
+        await environment?.diagnostics.close()
+      }
+      finally {
+        app.exit(1)
+      }
+    })
+  }
 }

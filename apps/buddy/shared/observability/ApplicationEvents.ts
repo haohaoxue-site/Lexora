@@ -1,10 +1,10 @@
 import type { ApplicationDiagnostic, ApplicationDiagnosticReporter } from '../diagnostics/applicationDiagnostic'
-import { readDiagnosticErrorCode } from '../diagnostics/applicationDiagnostic'
+import { readDiagnosticError } from '../diagnostics/applicationDiagnostic'
 
 export type ComponentEvent = `component.${'registered' | 'starting' | 'ready' | 'start_failed' | 'stopping' | 'stopped' | 'stop_failed'}`
 export type OperationName = 'startup.step' | 'shutdown.step' | 'rpc.request' | 'rpc.handler' | 'session.open' | 'session.close' | 'session.resources' | 'session.recovery' | 'automation.dispatch' | 'provider.refresh' | 'connector.connect'
 export type OperationEvent = `${OperationName}.${'started' | 'completed' | 'failed' | 'cancelled'}`
-export type EventContext = Omit<ApplicationDiagnostic, 'event' | 'level' | 'durationMs' | 'errorCode' | 'errorType' | 'count' | 'attempt' | 'sourceSequence' | 'occurredAt'>
+export type EventContext = Omit<ApplicationDiagnostic, 'event' | 'level' | 'durationMs' | 'errorCode' | 'errorType' | 'failure' | 'count' | 'attempt' | 'sourceSequence' | 'occurredAt'>
 type Listener = (event: Readonly<ApplicationDiagnostic>) => unknown
 
 interface EventChannel {
@@ -69,7 +69,7 @@ export class ApplicationEvents {
         event: `${name}.${cancelled ? 'cancelled' : 'failed'}`,
         level: cancelled ? 'info' : 'error',
         durationMs: Math.round(performance.now() - startedAt),
-        errorCode: readDiagnosticErrorCode(error),
+        ...readDiagnosticError(error),
       })
       throw error
     }
