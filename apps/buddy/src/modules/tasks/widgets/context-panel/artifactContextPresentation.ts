@@ -1,4 +1,5 @@
 import type { LocalArtifact } from '@buddy-shared/artifacts/artifactApi'
+import type { ArtifactViewMode } from './taskContextPanel'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 
 export function resolveFileType(artifact: LocalArtifact): string {
@@ -13,6 +14,24 @@ export function formatDate(value: string, locale: BuddyLocale): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
+}
+
+export function isMarkdownArtifact(artifact: Pick<LocalArtifact, 'kind' | 'name' | 'mimeType'>): boolean {
+  return artifact.kind === 'file'
+    && (artifact.mimeType === 'text/markdown' || /\.(?:md|markdown)$/i.test(artifact.name))
+}
+
+export function resolveArtifactDisplayMode(
+  artifact: Pick<LocalArtifact, 'kind' | 'name' | 'mimeType'>,
+  viewMode: ArtifactViewMode,
+): ArtifactViewMode | 'file' | 'directory' {
+  if (artifact.kind === 'directory')
+    return 'directory'
+  if (isMarkdownArtifact(artifact))
+    return viewMode
+  if (artifact.mimeType.startsWith('image/'))
+    return 'preview'
+  return isTextMimeType(artifact.mimeType) ? 'source' : 'file'
 }
 
 export function isTextMimeType(mimeType: string): boolean {

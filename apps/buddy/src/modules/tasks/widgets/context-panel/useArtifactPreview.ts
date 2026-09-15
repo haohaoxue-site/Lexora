@@ -1,6 +1,6 @@
 import type { LocalArtifact, LocalArtifactText } from '@buddy-shared/artifacts/artifactApi'
 import { computed, readonly, shallowRef, watch } from 'vue'
-import { isTextMimeType } from './artifactContextPresentation'
+import { isMarkdownArtifact, isTextMimeType } from './artifactContextPresentation'
 
 interface ArtifactPreviewOptions {
   artifact: () => LocalArtifact
@@ -39,7 +39,7 @@ export function useArtifactPreview(options: ArtifactPreviewOptions) {
     previewOpen.value = false
     textPreview.value = null
     textPreviewFailed.value = false
-    textPreviewLoading.value = kind === 'file' && isTextMimeType(mimeType)
+    textPreviewLoading.value = kind === 'file' && (isTextMimeType(mimeType) || isMarkdownArtifact(options.artifact()))
     if (!textPreviewLoading.value)
       return
     try {

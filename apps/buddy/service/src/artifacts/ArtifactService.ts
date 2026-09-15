@@ -244,7 +244,7 @@ export class ArtifactService {
     const artifact = this.#requireVisibleArtifact(id)
     if (
       artifact.kind !== 'file'
-      || !isTextArtifact(artifact.mimeType)
+      || (!isTextArtifact(artifact.mimeType) && inferArtifactMimeType(artifact.name) !== 'text/markdown')
       || artifact.sizeBytes > BUDDY_ARTIFACT_TEXT_BYTES_LIMIT
     ) {
       throw new ArtifactError('VALIDATION_FAILED')
@@ -390,6 +390,7 @@ export function inferArtifactMimeType(path: string): string {
     ['.js', 'text/javascript'],
     ['.json', 'application/json'],
     ['.md', 'text/markdown'],
+    ['.markdown', 'text/markdown'],
     ['.pdf', 'application/pdf'],
     ['.png', 'image/png'],
     ['.py', 'text/x-python'],
@@ -427,6 +428,7 @@ function languageFromArtifactName(name: string): string | null {
     ['js', 'javascript'],
     ['json', 'javascript'],
     ['md', 'markdown'],
+    ['markdown', 'markdown'],
     ['py', 'python'],
     ['rs', 'rust'],
     ['scss', 'scss'],

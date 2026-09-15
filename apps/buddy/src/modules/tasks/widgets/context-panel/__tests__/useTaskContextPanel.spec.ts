@@ -155,6 +155,48 @@ describe('useTaskContextPanel', () => {
     expect(panel.tabs.value).toEqual([])
   })
 
+  it('defaults artifacts to preview and keeps each tab mode until it is closed', async () => {
+    const activeConversationId = shallowRef<string | null>('conversation-1')
+    const runOutputs = shallowRef<readonly LocalRunOutput[]>([output('run-1', [
+      { ...artifact('first', 'conversation-1', 'first.md'), mimeType: 'text/markdown' },
+      { ...artifact('second', 'conversation-1', 'second.markdown'), mimeType: 'text/markdown' },
+    ])])
+    const panel = useTaskContextPanel({
+      spaces: shallowRef([]),
+      activeConversationId,
+      activeRunId: shallowRef(null),
+      changeSets: shallowRef([]),
+      runSignalEvents: shallowRef([]),
+      runOutputs,
+    })
+    panel.openArtifact('first')
+    expect(panel.activeTab.value).toMatchObject({ viewMode: 'preview' })
+    panel.setArtifactViewMode('artifact:first', 'source')
+    panel.openArtifact('second')
+    expect(panel.activeTab.value).toMatchObject({ viewMode: 'preview' })
+    panel.selectTab('artifact:first')
+    expect(panel.activeTab.value).toMatchObject({ viewMode: 'source' })
+    panel.toggle()
+    panel.toggle()
+    expect(panel.activeTab.value).toMatchObject({ viewMode: 'source' })
+
+    runOutputs.value = runOutputs.value.map(item => ({
+      ...item,
+      artifacts: item.artifacts.map(file => ({ ...file, updatedAt: '2026-09-15T00:00:00.000Z' })),
+    }))
+    panel.openArtifact('first')
+    expect(panel.activeTab.value).toMatchObject({ viewMode: 'source', artifact: { updatedAt: '2026-09-15T00:00:00.000Z' } })
+    activeConversationId.value = 'conversation-2'
+    await nextTick()
+    expect(panel.tabs.value).toEqual([])
+    activeConversationId.value = 'conversation-1'
+    await nextTick()
+    expect(panel.activeTab.value).toMatchObject({ viewMode: 'source' })
+    panel.closeTab('artifact:first')
+    panel.openArtifact('first')
+    expect(panel.activeTab.value).toMatchObject({ viewMode: 'preview' })
+  })
+
   it('opens a run change set in the current conversation context', async () => {
     const activeConversationId = shallowRef<string | null>('conversation-1')
     const changeSets = shallowRef<ReadonlyArray<LocalChangeSetSummary>>([

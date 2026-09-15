@@ -20,6 +20,7 @@ const languages: Record<string, string> = {
   tsx: 'typescript',
   jsx: 'javascript',
   md: 'markdown',
+  markdown: 'markdown',
   py: 'python',
   rs: 'rust',
   scss: 'scss',

@@ -36,7 +36,7 @@ const props = defineProps<{
 const { t } = useBuddyI18n(() => props.language)
 const message = useMessage()
 const fileSpacePickerOpen = shallowRef(false)
-const { browser, browserGuests } = useTaskContext()
+const { browser, browserGuests, clipboard } = useTaskContext()
 const activeTab = computed(() => props.panel.activeTab.value)
 const fileTab = computed(() => activeTab.value?.kind === 'files' ? activeTab.value : null)
 const changeTab = computed(() => activeTab.value?.kind === 'changes' ? activeTab.value : null)
@@ -138,7 +138,7 @@ function browserMenu(action: BrowserToolbarMenuActionKey) {
       <DesktopFileToolbar v-if="fileTab && fileView" :path="fileTab.target.path" :root-name="fileTab.rootName" :language="language" :wrap="fileView.wrap" :tree-visible="fileView.treeVisible" @reveal="revealFile" @toggle-wrap="fileView.wrap = !fileView.wrap" @toggle-tree="fileView.treeVisible = !fileView.treeVisible" />
       <DesktopChangeToolbar v-else-if="changeTab && changeView" v-model:range="changeView.range" :language="language" :added="changes.counts.value.added" :deleted="changes.counts.value.deleted" :can-show-turn="Boolean(changeTab.changeSet)" :all-collapsed="allCollapsed" :wrap="changeView.wrap" :side-by-side="changeView.sideBySide" :tree-visible="changeView.treeVisible" @toggle-all="changes.toggleAll" @toggle-wrap="changeView.wrap = !changeView.wrap" @toggle-layout="changeView.sideBySide = !changeView.sideBySide" @toggle-tree="changeView.treeVisible = !changeView.treeVisible" />
       <DesktopBrowserToolbar v-else-if="browserTab" :address="address" :busy-action="busyAction" :language="language" :state="browserState" @back="browserView.goBack" @forward="browserView.goForward" @navigate="openAddress" @reload="browserView.reload" @stop="browserView.stop" @update:address="updateAddress" @menu="browserMenu" />
-      <DesktopArtifactToolbar v-else-if="activeTab?.kind === 'artifact'" :artifact="activeTab.artifact" :language="language" />
+      <DesktopArtifactToolbar v-else-if="activeTab?.kind === 'artifact'" :artifact="activeTab.artifact" :language="language" :view-mode="activeTab.viewMode" @update:view-mode="panel.setArtifactViewMode(activeTab.id, $event)" />
     </template>
     <DesktopContextSplit v-if="fileTab && fileView" v-model:width="fileView.treeWidth" :tree-visible="fileView.treeVisible">
       <div v-if="fileView.loading" class="context-resource-state">
@@ -229,7 +229,7 @@ function browserMenu(action: BrowserToolbarMenuActionKey) {
         :aria-label="t('desktop.context.browserViewport')"
       />
     </section>
-    <DesktopArtifactContextSurface v-else-if="activeTab?.kind === 'artifact'" :artifact="activeTab.artifact" :language="language" :read-artifact-text="context.readArtifactText" />
+    <DesktopArtifactContextSurface v-else-if="activeTab?.kind === 'artifact'" :key="activeTab.id" :artifact="activeTab.artifact" :language="language" :view-mode="activeTab.viewMode" :read-artifact-text="context.readArtifactText" :write-clipboard-text="clipboard.writeText" />
   </DesktopTaskContextPanel>
 </template>
 

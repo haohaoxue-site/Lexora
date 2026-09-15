@@ -5,6 +5,7 @@ import type { TaskChangesContextTab } from '../taskContextPanel'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { computed, effectScope, nextTick, shallowRef } from 'vue'
 import { deferred } from '../../../../../../__tests__/deferred'
+import { isMarkdownArtifact, resolveArtifactDisplayMode } from '../artifactContextPresentation'
 import { useArtifactPreview } from '../useArtifactPreview'
 import { useContextChanges } from '../useContextChanges'
 
@@ -17,6 +18,42 @@ function own<T>(setup: () => T) {
 }
 
 describe('resource previews', () => {
+  it.each([
+    ['report.md', 'text/markdown', 'file', true],
+    ['REPORT.MD', 'text/plain', 'file', true],
+    ['report.markdown', 'application/octet-stream', 'file', true],
+    ['report', 'text/markdown', 'file', true],
+    ['report.txt', 'text/plain', 'file', false],
+    ['report.md', 'inode/directory', 'directory', false],
+  ] as const)('recognizes Markdown for %s (%s, %s)', (name, mimeType, kind, expected) => {
+    expect(isMarkdownArtifact({ name, mimeType, kind })).toBe(expected)
+  })
+
+  it.each([
+    ['report.md', 'text/markdown', 'file', 'preview', 'preview'],
+    ['report.md', 'text/markdown', 'file', 'source', 'source'],
+    ['legacy.markdown', 'application/octet-stream', 'file', 'preview', 'preview'],
+    ['notes.txt', 'text/plain', 'file', 'preview', 'source'],
+    ['data.json', 'application/json', 'file', 'preview', 'source'],
+    ['image.png', 'image/png', 'file', 'source', 'preview'],
+    ['drawing.svg', 'image/svg+xml', 'file', 'source', 'preview'],
+    ['report.pdf', 'application/pdf', 'file', 'preview', 'file'],
+    ['archive.zip', 'application/zip', 'file', 'source', 'file'],
+    ['folder.md', 'inode/directory', 'directory', 'source', 'directory'],
+  ] as const)('selects the display mode for %s (%s, %s, requested %s)', (name, mimeType, kind, requested, expected) => {
+    expect(resolveArtifactDisplayMode({ name, mimeType, kind }, requested)).toBe(expected)
+  })
+
+  it('reads legacy Markdown artifacts without requiring their stored MIME type to change', async () => {
+    const artifact = { ...createArtifact('legacy'), name: 'legacy.markdown', mimeType: 'application/octet-stream' }
+    const text = { artifactId: artifact.artifactId, language: 'markdown', text: '# Original document' }
+    const { state } = own(() => useArtifactPreview({ artifact: () => artifact, readText: () => async () => text }))
+    expect(state.textPreviewLoading.value).toBe(true)
+    await nextTick()
+    expect(state.textPreview.value).toEqual(text)
+    expect(state.textPreviewLoading.value).toBe(false)
+  })
+
   it.each(['resolve', 'reject'] as const)('ignores an old text request that finishes with %s', async (outcome) => {
     const first = deferred<LocalArtifactText>()
     const artifact = shallowRef(createArtifact('first'))
