@@ -162,6 +162,7 @@ const {
           </NButton>
           <NSwitch
             class="desktop-provider-detail__model-switch"
+            :round="false"
             :value="model.enabled"
             :disabled="provider.activeRunCount > 0 || !model.available"
             @update:value="providerSettings.setProviderModelEnabled(provider.id, model.modelId, $event)"

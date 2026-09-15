@@ -32,6 +32,7 @@ async function updateSetting(field: PetSettingField, patch: LexoraConfigPatch) {
         </div>
         <div class="desktop-settings-row__control">
           <NSwitch
+            :round="false"
             :value="config.pet.enabled"
             @update:value="updateSetting('enabled', { pet: { enabled: $event } })"
           />
@@ -48,6 +49,7 @@ async function updateSetting(field: PetSettingField, patch: LexoraConfigPatch) {
         </div>
         <div class="desktop-settings-row__control">
           <NSwitch
+            :round="false"
             :value="config.pet.alwaysOnTop"
             @update:value="updateSetting('alwaysOnTop', { pet: { alwaysOnTop: $event } })"
           />
@@ -64,6 +66,7 @@ async function updateSetting(field: PetSettingField, patch: LexoraConfigPatch) {
         </div>
         <div class="desktop-settings-row__control">
           <NSwitch
+            :round="false"
             :value="config.pet.rememberPosition"
             @update:value="updateSetting('rememberPosition', { pet: { rememberPosition: $event } })"
           />

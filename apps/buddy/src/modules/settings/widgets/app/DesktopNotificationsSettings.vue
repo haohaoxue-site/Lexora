@@ -34,6 +34,7 @@ async function updateSetting(field: NotificationSettingField, patch: LexoraConfi
         </div>
         <div class="desktop-settings-row__control">
           <NSwitch
+            :round="false"
             :value="config.desktop.notificationsEnabled"
             @update:value="updateSetting('notifications', { desktop: { notificationsEnabled: $event } })"
           />
@@ -50,6 +51,7 @@ async function updateSetting(field: NotificationSettingField, patch: LexoraConfi
         </div>
         <div class="desktop-settings-row__control">
           <NSwitch
+            :round="false"
             :value="config.desktop.notifyWhenFocused"
             @update:value="updateSetting('notifyWhenFocused', { desktop: { notifyWhenFocused: $event } })"
           />

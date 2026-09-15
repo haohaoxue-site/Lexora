@@ -65,6 +65,7 @@ const { authChallenge, language } = providerSettings
     </template>
     <template v-if="provider" #actions>
       <NSwitch
+        :round="false"
         :value="provider.enabled"
         :disabled="provider.activeRunCount > 0 || (!provider.enabled && !provider.setupComplete)"
         @update:value="providerSettings.setProviderEnabled(provider.id, $event)"

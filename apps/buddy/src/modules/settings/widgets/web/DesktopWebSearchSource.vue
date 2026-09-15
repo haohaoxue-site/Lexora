@@ -33,7 +33,7 @@ useSortable({ id: () => props.source.provider, index: () => props.index, disable
         {{ t(`desktop.web.${source.provider}SearchDescription`) }}
       </NTooltip>
     </div>
-    <NSwitch :aria-labelledby="`web-search-${source.provider}`" :value="source.enabled" :disabled="disabled" @update:value="emit('toggle', $event)" />
+    <NSwitch :round="false" :aria-labelledby="`web-search-${source.provider}`" :value="source.enabled" :disabled="disabled" @update:value="emit('toggle', $event)" />
   </li>
 </template>
 

@@ -231,6 +231,7 @@ async function connect(authType: 'api_key' | 'oauth') {
               </div>
               <span v-if="!model.available">{{ t('desktop.providers.notFoundInLastSync') }}</span>
               <NSwitch
+                :round="false"
                 :value="model.enabled"
                 :disabled="!model.available"
                 @update:value="toggleModel(model.modelId, $event)"
