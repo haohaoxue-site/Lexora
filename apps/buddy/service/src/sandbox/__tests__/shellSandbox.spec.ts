@@ -94,6 +94,12 @@ describe.skipIf(process.platform !== 'linux' || process.arch !== 'x64')('linux s
     await expect(access(join(workspace, 'new-file'))).rejects.toThrow()
   }, 15_000)
 
+  it('returns an ordinary program failure without adding sandbox recovery advice', async () => {
+    const { result, output } = await execute('printf ordinary-program-error >&2; exit 7')
+    expect(result).toEqual({ ok: true, exitCode: 7 })
+    expect(output).toBe('ordinary-program-error')
+  }, 15_000)
+
   it('limits additional read permission across interpreters and descendants without silently granting write access', async () => {
     const metadata = await stat(outside, { bigint: true })
     const grant = { access: 'read' as const, path: outside, device: String(metadata.dev), inode: String(metadata.ino) }

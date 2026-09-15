@@ -109,9 +109,9 @@ const approvalOperation = computed(() => (
   || (props.approval.kind === 'mcp' && props.approval.summary.trim())
   || t(`desktop.approval.kind.${props.approval.kind}`)
 ))
-const approvalTitle = computed(() => t('desktop.approval.title', {
-  operation: approvalOperation.value,
-}))
+const approvalTitle = computed(() => review.value?.card === 'sandbox-network'
+  ? t('desktop.approval.sandbox.networkTitle')
+  : t('desktop.approval.title', { operation: approvalOperation.value }))
 const approvalDescription = computed(() => (
   review.value?.card === 'sandbox-directory'
     ? t('desktop.approval.sandbox.directoryScope')

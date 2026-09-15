@@ -90,6 +90,7 @@ export default {
   'desktop.approval.shell.reason.sandbox-bypass': '此命令将在沙盒外执行，可访问当前用户的文件、凭据、网络和桌面服务。',
   'desktop.approval.sandbox.hostScope': '将在本机直接执行，不受沙盒目录与网络限制',
   'desktop.approval.sandbox.isolatedScope': '将在沙盒内执行，目录和网络限制保持生效',
+  'desktop.approval.sandbox.networkTitle': '运行命令 · 需要联网',
   'desktop.approval.sandbox.networkScope': '确认执行仅允许当前命令访问此主机与端口，可能发送已授权目录中的内容；如需后续命令复用，可在更多操作中选择授权范围。',
   'desktop.approval.sandbox.directoryScope': '仅对本轮的沙盒命令生效；本轮结束、停止或重启后失效。不更改空间、对话的长期授权，也不授权其他工具。敏感文件保护保持生效。',
   'desktop.approval.sandbox.directoryRead': '读取目录及其内容，不增加写入或删除权限',

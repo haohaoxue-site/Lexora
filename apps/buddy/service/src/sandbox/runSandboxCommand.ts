@@ -1,6 +1,5 @@
 import type { SandboxNetworkTarget, SandboxProcessInput, SandboxResult } from '../../../shared/permissions/shellSandbox'
 import type { SandboxExecutionOptions } from './sandboxExecutionLifecycle'
-import { Buffer } from 'node:buffer'
 import { sandboxNetworkTargetSchema, ShellSandboxError } from '../../../shared/permissions/shellSandbox'
 import { runLinuxSandbox } from './runLinuxSandbox'
 import { runWindowsSandbox } from './runWindowsSandbox'
@@ -37,9 +36,6 @@ export async function runSandboxCommand(input: SandboxProcessInput, options: Omi
       : await runLinuxSandbox({ ...input, backend: input.backend }, execution)
     if (lifecycle.signal.aborted)
       return { ok: false, code: lifecycle.timedOut ? 'SANDBOX_TIMEOUT' : 'SANDBOX_CANCELLED' }
-    if (exitCode !== 0) {
-      options.onData(Buffer.from('\n[Execution boundary] This command ran in a sandbox; a nonzero exit does not necessarily mean isolation blocked it. Additional directories require lexora_authorize_directory; host execution requires lexora_host_shell and separate approval. Do not retry a declined request.\n'))
-    }
     return { ok: true, exitCode }
   }
   catch (error) {
