@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createToolPolicyExtension } from '../../agent/extensions/toolPolicyExtension'
 import { PermissionEngine } from '../PermissionEngine'
 import { createSensitivePathMatcher } from '../sensitivePaths'
+import { ToolAuthorizationService } from '../ToolAuthorizationService'
 
 const roots: string[] = []
 const executeFile = promisify(execFile)
@@ -37,14 +38,12 @@ describe.skipIf(process.platform === 'win32')('shell file deletion permissions',
       type: 'deny',
     })
     await expect(fixture.engine.decide(request(fixture, 'rm obsolete.vue', { approvalPolicy: 'manual' }))).resolves.toEqual({
-      allowForTurn: true,
       kind: 'delete',
       paths: [{ path: join(fixture.workspace, 'obsolete.vue'), zone: 'workspace' }],
       summary: 'Delete local content',
       type: 'ask',
     })
     await expect(fixture.engine.decide(request(fixture, 'rm obsolete.vue', { forceAsk: true }))).resolves.toMatchObject({
-      allowForTurn: false,
       kind: 'delete',
       type: 'ask',
     })
@@ -59,7 +58,6 @@ describe.skipIf(process.platform === 'win32')('shell file deletion permissions',
     const path = join(fixture.outside, 'obsolete.vue')
     const command = `rm obsolete.vue "${path}"`
     await expect(fixture.engine.decide(request(fixture, command))).resolves.toEqual({
-      allowForTurn: true,
       grant: { owner: { id: 'space-1', kind: 'space' }, root: fixture.outside },
       kind: 'delete',
       paths: [
@@ -169,31 +167,34 @@ describe.skipIf(process.platform === 'win32')('shell file deletion permissions',
     const facts: string[] = []
     let handler!: (event: ToolCallEvent) => Promise<ToolCallEventResult | void>
     const extension = createToolPolicyExtension({
-      approvalAvailable: true,
-      approvalPolicy: 'policy',
-      approvalService: {
-        request: async (input) => {
-          expect(input.kind).toBe('delete')
-          expect(input.paths).toEqual({
-            access: 'delete',
-            grant: { owner: 'space', root: fixture.outside },
-            targets: [{ path: target, zone: 'outside' }],
-          })
-          await expect(readFile(target, 'utf8')).resolves.toBe('fixture')
-          facts.push('reviewed')
-          return { approvalId: 'approval-1', decision: outcome === 'grant_failure' ? 'approved_once' : outcome }
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        approvalPolicy: 'policy',
+        approvalService: {
+          request: async (input) => {
+            expect(input.kind).toBe('delete')
+            expect(input.paths).toEqual({
+              access: 'delete',
+              grant: { owner: 'space', root: fixture.outside },
+              targets: [{ path: target, zone: 'outside' }],
+            })
+            await expect(readFile(target, 'utf8')).resolves.toBe('fixture')
+            facts.push('reviewed')
+            return { approvalId: 'approval-1', decision: outcome === 'grant_failure' ? 'approved_once' : outcome }
+          },
         },
-      },
-      applyGrant: async (grant) => {
-        if (outcome === 'grant_failure')
-          throw new Error('fixture grant failure')
-        fixture.grants.push({ canonicalRoot: grant.root, grantId: 'external-1', kind: 'granted', root: grant.root })
-        facts.push('granted')
-      },
-      cwd: fixture.workspace,
-      engine: fixture.engine,
-      executionProfile: 'workspace_write',
-      getGrants: () => fixture.grants,
+        applyGrant: async (grant) => {
+          if (outcome === 'grant_failure')
+            throw new Error('fixture grant failure')
+          fixture.grants.push({ canonicalRoot: grant.root, grantId: 'external-1', kind: 'granted', root: grant.root })
+          facts.push('granted')
+        },
+        cwd: fixture.workspace,
+        engine: fixture.engine,
+        executionProfile: 'workspace_write',
+        getGrants: () => fixture.grants,
+        owner: { id: 'space-1', kind: 'space' },
+      }),
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized: async () => { facts.push('authorized') },
@@ -201,7 +202,6 @@ describe.skipIf(process.platform === 'win32')('shell file deletion permissions',
         runId: 'run-1',
         signal: new AbortController().signal,
       }),
-      owner: { id: 'space-1', kind: 'space' },
     })
     extension.factory({
       on: (_name: string, callback: typeof handler) => {

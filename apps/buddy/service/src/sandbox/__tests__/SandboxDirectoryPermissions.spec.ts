@@ -12,6 +12,7 @@ import { createToolPolicyExtension } from '../../agent/extensions/toolPolicyExte
 import { ApprovalCancelledError } from '../../approvals/ApprovalService'
 import { PermissionEngine } from '../../permissions/PermissionEngine'
 import { createSensitivePathMatcher } from '../../permissions/sensitivePaths'
+import { ToolAuthorizationService } from '../../permissions/ToolAuthorizationService'
 import { SandboxDirectoryPermissions, validateSandboxDirectory } from '../SandboxDirectoryPermissions'
 
 describe('run-scoped shell directory permissions', () => {
@@ -50,23 +51,25 @@ describe('run-scoped shell directory permissions', () => {
     }
     let handler: ((event: ToolCallEvent) => Promise<ToolCallEventResult | void>) | undefined
     const extension = createToolPolicyExtension({
-      applyGrant: (grant) => { persisted.push(grant) },
-      applySandboxDirectory: (context, grant) => permissions.grant(context, grant),
-      approvalAvailable: options.approvalAvailable ?? true,
-      approvalPolicy: 'policy',
-      approvalService: {
-        request: async (request) => {
-          reviews.push(request)
-          return { approvalId: `approval-${reviews.length}`, decision: await options.approve?.() ?? 'approved_once' }
+      authorization: new ToolAuthorizationService({
+        applyGrant: (grant) => { persisted.push(grant) },
+        applySandboxDirectory: (context, grant) => permissions.grant(context, grant),
+        approvalAvailable: options.approvalAvailable ?? true,
+        approvalPolicy: 'policy',
+        approvalService: {
+          request: async (request) => {
+            reviews.push(request)
+            return { approvalId: `approval-${reviews.length}`, decision: await options.approve?.() ?? 'approved_once' }
+          },
         },
-      },
+        cwd: workspace,
+        engine: new PermissionEngine({ sensitive: createSensitivePathMatcher({ home: root, environment: {} }) }),
+        executionProfile: options.profile ?? 'workspace_write',
+        getGrants: () => [{ canonicalRoot: workspace, root: workspace, kind: 'workspace', grantId: 'workspace' }],
+        owner: { kind: 'conversation', id: 'conversation' },
+      }),
       classifyTool: () => ({ shellBoundary: 'sandbox' }),
-      cwd: workspace,
-      engine: new PermissionEngine({ sensitive: createSensitivePathMatcher({ home: root, environment: {} }) }),
-      executionProfile: options.profile ?? 'workspace_write',
-      getGrants: () => [{ canonicalRoot: workspace, root: workspace, kind: 'workspace', grantId: 'workspace' }],
       getRunContext: () => run,
-      owner: { kind: 'conversation', id: 'conversation' },
     })
     extension.factory({
       on: (_name: string, callback: typeof handler) => { handler = callback },
@@ -91,7 +94,6 @@ describe('run-scoped shell directory permissions', () => {
     await expect(harness.invoke()).resolves.toBeUndefined()
     expect(harness.reviews).toMatchObject([{
       kind: 'read',
-      allowForTurn: false,
       sandboxDirectory: { path: outside, access: 'read', reason: 'Inspect the reference files' },
     }])
     expect(harness.permissions.get(harness.run)).toEqual([{
@@ -109,7 +111,7 @@ describe('run-scoped shell directory permissions', () => {
     const harness = createHarness()
     await harness.invoke()
     await harness.invoke({ path: outside, access: 'write', reason: 'Update the requested output' } satisfies SandboxDirectoryRequest)
-    expect(harness.reviews.map(review => [review.kind, review.allowForTurn])).toEqual([['read', false], ['write', false]])
+    expect(harness.reviews.map(review => review.kind)).toEqual(['read', 'write'])
     expect(harness.permissions.get(harness.run)).toMatchObject([{ path: outside, access: 'write' }])
     expect(harness.permissions.getWriteGrants(harness.run)).toMatchObject([{ canonicalRoot: outside, kind: 'granted' }])
     expect(harness.persisted).toEqual([])
@@ -123,11 +125,18 @@ describe('run-scoped shell directory permissions', () => {
     expect(harness.reviews).toHaveLength(1)
   })
 
-  it.each(['denied', 'approved_for_turn'] as const)('does not grant access for %s', async (decision) => {
-    const harness = createHarness({ approve: async () => decision })
+  it('does not grant access when denied', async () => {
+    const harness = createHarness({ approve: async () => 'denied' })
     await expect(harness.invoke()).resolves.toMatchObject({ block: true })
     expect(harness.permissions.get(harness.run)).toEqual([])
     expect(harness.authorized).toEqual([])
+    expect(harness.persisted).toEqual([])
+  })
+
+  it('applies a turn approval to the reviewed directory without persisting it', async () => {
+    const harness = createHarness({ approve: async () => 'approved_for_turn' })
+    await expect(harness.invoke()).resolves.toBeUndefined()
+    expect(harness.permissions.get(harness.run)).toMatchObject([{ path: outside, access: 'read' }])
     expect(harness.persisted).toEqual([])
   })
 

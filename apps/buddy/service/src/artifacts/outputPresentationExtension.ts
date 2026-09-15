@@ -21,6 +21,7 @@ export function createOutputPresentationCapability(options: CreateOutputPresenta
 }
 
 export interface CreateOutputPresentationExtensionOptions {
+  getExecutionGrants?: (toolCallId: string) => readonly DirectoryGrant[]
   artifactService: {
     presentOutputs: (input: {
       conversationId: string
@@ -46,7 +47,7 @@ export function createOutputPresentationExtension(
           'Declare existing files or directories as the user-facing outputs of the current task.',
           'Each path is an independent deliverable; include a directory only when the directory itself is what the user should receive.',
         ].join(' '),
-        execute: async (_toolCallId, parameters) => {
+        execute: async (toolCallId, parameters) => {
           if (!Check(outputPresentParameters, parameters) || !options.getRunId())
             return outputPresentFailure('VALIDATION_FAILED')
           try {
@@ -54,7 +55,7 @@ export function createOutputPresentationExtension(
             const artifacts = await options.artifactService.presentOutputs({
               conversationId: options.conversationId,
               cwd: options.cwd,
-              grants: options.grants,
+              grants: options.getExecutionGrants?.(toolCallId) ?? options.grants,
               paths: input.paths,
             })
             const artifactIds = artifacts.map(artifact => artifact.id)

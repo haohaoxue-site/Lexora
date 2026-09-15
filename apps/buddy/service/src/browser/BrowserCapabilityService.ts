@@ -74,6 +74,7 @@ export interface BrowserCapabilityHost {
 }
 
 export interface BrowserCapabilityServiceOptions {
+  getExecutionGrants?: (toolCallId: string) => readonly DirectoryGrant[]
   conversationId: string
   getGrants: () => readonly DirectoryGrant[]
   host: BrowserCapabilityHost
@@ -104,7 +105,7 @@ export class BrowserCapabilityService {
     this.#host = options.host
   }
 
-  async open(target: BrowserCapabilityOpenTarget): Promise<BrowserOpenResult> {
+  async open(target: BrowserCapabilityOpenTarget, grants = this.#getGrants()): Promise<BrowserOpenResult> {
     this.#policyObservation = null
     const result = target.kind === 'url'
       ? await this.#host.openUrl({
@@ -115,7 +116,7 @@ export class BrowserCapabilityService {
       : await this.#host.openLocal({
           conversationId: this.#conversationId,
           entryPath: target.entryPath,
-          grants: this.#getGrants().map(cloneGrant),
+          grants: grants.map(cloneGrant),
           ...(target.until ? { until: target.until } : {}),
         })
     if (!result.ok) {

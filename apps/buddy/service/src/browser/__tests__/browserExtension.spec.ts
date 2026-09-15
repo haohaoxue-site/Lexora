@@ -198,7 +198,7 @@ describe('browserExtension', () => {
     const urlResult = await execute(open, urlInput)
     const localResult = await execute(open, localInput)
 
-    expect(fixture.service.open.mock.calls).toEqual([[urlInput], [localInput]])
+    expect(fixture.service.open.mock.calls).toEqual([[urlInput, undefined], [localInput, undefined]])
     expect(fixture.service.observe.mock.calls).toEqual([[], []])
     expect(urlResult).toMatchObject({
       details: {

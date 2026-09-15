@@ -57,13 +57,14 @@ const browserFailureRecoveryGuideline = [
 ].join(' ')
 
 export interface CreateBrowserExtensionOptions {
+  getExecutionGrants?: BrowserCapabilityServiceOptions['getExecutionGrants']
   service: BrowserExtensionService
 }
 
 export function createBrowserCapability(options: BrowserCapabilityServiceOptions): BuddyCapability {
   const service = new BrowserCapabilityService(options)
   return {
-    extension: createBrowserExtension({ service }),
+    extension: createBrowserExtension({ service, getExecutionGrants: options.getExecutionGrants }),
     classify: event => classifyBrowserTool(event, service),
     disclosure: {
       group: 'browser',
@@ -79,7 +80,7 @@ export function createBrowserExtension(
   return {
     name: 'lexora-browser',
     factory(pi) {
-      pi.registerTool(createBrowserOpenTool(options.service))
+      pi.registerTool(createBrowserOpenTool(options.service, options.getExecutionGrants))
       pi.registerTool(createBrowserSnapshotTool(options.service))
       pi.registerTool(createBrowserActTool(options.service))
       pi.on('tool_result', normalizeBrowserToolResult)
@@ -137,16 +138,16 @@ function createBrowserActTool(service: BrowserExtensionService) {
   })
 }
 
-function createBrowserOpenTool(service: BrowserExtensionService) {
+function createBrowserOpenTool(service: BrowserExtensionService, getExecutionGrants?: CreateBrowserExtensionOptions['getExecutionGrants']) {
   return defineTool<TSchema, BrowserToolDetails>({
     description: `Open an HTTP(S) or granted local HTML page in the browser visible to the user. Use until to wait for semantic content on SPA pages. ${browserUntrustedDataNotice}`,
-    async execute(_toolCallId, input, signal) {
+    async execute(toolCallId, input, signal) {
       if (!isBrowserOpenToolInput(input))
         return failureResult('open', 'VALIDATION_FAILED', null)
       const executionSignal = signal ?? new AbortController().signal
       try {
         executionSignal.throwIfAborted()
-        const result = await service.open(input)
+        const result = await service.open(input, getExecutionGrants?.(toolCallId))
         executionSignal.throwIfAborted()
         if (!result.ok)
           return hostFailureResult('open', result.error)

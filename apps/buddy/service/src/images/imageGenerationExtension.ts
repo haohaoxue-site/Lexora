@@ -2,6 +2,7 @@ import type { ToolDefinition } from '@earendil-works/pi-coding-agent'
 import type { Static, TSchema } from 'typebox'
 import type { BuddyCapability } from '../agent/extensions/BuddyCapability'
 import type { BuddyInProcessExtension } from '../agent/extensions/BuddyInProcessExtension'
+import type { DirectoryGrant } from '../directories/resolveGrantedPath'
 import type { ImageGenerationErrorCode, ImageGenerationErrorDiagnostic } from './ImageGenerationGateway'
 import type { ImageGenerationService } from './ImageGenerationService'
 import type { ImageGenerationToolDetails } from './imageGenerationToolContract'
@@ -12,6 +13,7 @@ import { classifyImageGenerationTool, IMAGE_GENERATION_TOOL_NAME, readImageGener
 import { imageGenerationParameters } from './imageGenerationToolParameters'
 
 export interface CreateImageGenerationExtensionOptions {
+  getExecutionGrants?: (toolCallId: string) => readonly DirectoryGrant[]
   getRunId: () => string | undefined
   service: Pick<ImageGenerationService, 'generate' | 'supports'>
 }
@@ -55,7 +57,7 @@ function createImageGenerationTool(options: CreateImageGenerationExtensionOption
       'Use reference.mode=resources for exact attachment or artifact ids, or reference.mode=latest for the latest image in this conversation.',
       'Generated images are saved and shown in the Lexora Buddy conversation immediately.',
     ].join(' '),
-    execute: async (_toolCallId, parameters, signal, _onUpdate, context) => {
+    execute: async (toolCallId, parameters, signal, _onUpdate, context) => {
       if (!Check(imageGenerationParameters, parameters) || !options.getRunId())
         return imageToolFailure('VALIDATION_FAILED')
       const input = parameters as Static<typeof imageGenerationParameters>
@@ -67,7 +69,7 @@ function createImageGenerationTool(options: CreateImageGenerationExtensionOption
         return imageToolFailure('IMAGE_GENERATION_UNSUPPORTED')
       const executionSignal = signal ?? new AbortController().signal
       try {
-        const result = await options.service.generate(input, model, executionSignal)
+        const result = await options.service.generate(input, model, executionSignal, options.getExecutionGrants?.(toolCallId))
         return {
           content: [{
             text: JSON.stringify({ artifactIds: result.artifactIds, generatedCount: result.artifactIds.length }),

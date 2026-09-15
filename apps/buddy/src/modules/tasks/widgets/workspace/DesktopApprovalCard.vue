@@ -147,8 +147,28 @@ const reuseScopes = computed<readonly ApprovalReuseScope[]>(() => (
 ))
 const reuseOptions = computed<DropdownOption[]>(() => reuseScopes.value.map(scope => ({
   key: scope,
-  label: t(`approvalAction.approveFor.${scope}`),
+  label: scopeLabel(scope),
 })))
+function scopeLabel(scope: ApprovalReuseScope) {
+  if (scope === 'turn')
+    return t('approvalAction.approveFor.turn')
+  if (scope === 'operation') {
+    if (props.approval.kind === 'mcp')
+      return t('approvalAction.reuse.tool')
+    return t('approvalAction.approveFor.operation')
+  }
+  switch (review.value?.card) {
+    case 'sandbox-network': return t('approvalAction.reuse.networkTarget')
+    case 'network-target': return t('approvalAction.reuse.website')
+    case 'web': return t(review.value.operation === 'search' ? 'approvalAction.reuse.searchProvider' : 'approvalAction.reuse.website')
+    case 'browser-action': return t('approvalAction.reuse.browserSite')
+    case 'shell': return t('approvalAction.reuse.shellDirectory')
+    case 'paths': return t('approvalAction.reuse.directory')
+    case 'system-action': return t('approvalAction.reuse.systemTarget')
+    case 'automation': return t('approvalAction.reuse.automation')
+    default: return t(props.approval.kind === 'mcp' ? 'approvalAction.reuse.connector' : 'approvalAction.approveFor.source')
+  }
+}
 function approveForScope(scope: string | number) {
   if (typeof scope === 'string' && reuseScopes.value.includes(scope as ApprovalReuseScope))
     emit('approve', scope as ApprovalReuseScope)
@@ -180,6 +200,9 @@ function renderScopeLabel(option: DropdownOption) {
         </strong>
         <span class="desktop-approval-card__description">
           {{ approvalDescription }}
+        </span>
+        <span v-if="reuseScopes.length" class="desktop-approval-card__description">
+          {{ t('approvalAction.reuse.lifetime') }}
         </span>
       </div>
     </header>

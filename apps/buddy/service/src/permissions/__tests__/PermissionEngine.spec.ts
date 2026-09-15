@@ -33,7 +33,6 @@ describe('permissionEngine', () => {
       arguments: { command: 'git status --short && git diff --check' },
       toolName: 'bash',
     }))).resolves.toMatchObject({
-      allowForTurn: true,
       shell: { cwd: fixture.workspace, reason: 'manual-policy' },
       type: 'ask',
     })
@@ -90,7 +89,6 @@ describe('permissionEngine', () => {
           profile,
           toolName: 'bash',
         })), command).resolves.toMatchObject({
-          allowForTurn: false,
           shell: { reason: 'sensitive-path' },
           type: 'ask',
         })
@@ -100,7 +98,7 @@ describe('permissionEngine', () => {
       await expect(engine.decide(request(fixture, {
         arguments: { command },
         toolName: 'bash',
-      })), command).resolves.toMatchObject({ allowForTurn: false, shell: { reason: 'sensitive-path' }, type: 'ask' })
+      })), command).resolves.toMatchObject({ shell: { reason: 'sensitive-path' }, type: 'ask' })
     }
     await expect(engine.decide(request(fixture, {
       arguments: { command: 'git diff --cached -- package.json' },
@@ -151,7 +149,7 @@ describe('permissionEngine', () => {
       arguments: { command: 'git diff --cached HEAD' },
       cwd: join(fixture.workspace, 'subdirectory'),
       toolName: 'bash',
-    }))).resolves.toMatchObject({ allowForTurn: false, shell: { reason: 'sensitive-path' }, type: 'ask' })
+    }))).resolves.toMatchObject({ shell: { reason: 'sensitive-path' }, type: 'ask' })
     await expect(engine.decide(request(fixture, {
       arguments: { command: 'git diff HEAD -- notes.md' },
       toolName: 'bash',
@@ -177,7 +175,6 @@ describe('permissionEngine', () => {
       arguments: { content: 'draft', path: join(fixture.outside, 'draft.md') },
       toolName: 'write',
     }))).resolves.toEqual({
-      allowForTurn: true,
       grant: {
         owner: { id: 'conversation-1', kind: 'conversation' },
         root: fixture.outside,
@@ -215,7 +212,6 @@ describe('permissionEngine', () => {
       }),
       approvalPolicy: 'manual',
     } as PermissionRequest)).resolves.toEqual({
-      allowForTurn: true,
       kind: 'write',
       paths: [{ path: join(fixture.workspace, 'draft.md'), zone: 'workspace' }],
       summary: 'Write local content',
@@ -234,7 +230,7 @@ describe('permissionEngine', () => {
     await expect(engine.decide(request(fixture, {
       arguments: { path: secret },
       toolName: 'read',
-    }))).resolves.toMatchObject({ allowForTurn: false, kind: 'read', type: 'ask' })
+    }))).resolves.toMatchObject({ kind: 'read', type: 'ask' })
     await expect(engine.decide(request(fixture, {
       arguments: { content: 'changed', path: secret },
       profile: 'full_access',
@@ -290,7 +286,6 @@ describe('permissionEngine', () => {
       profile: 'full_access',
       toolName: 'unknown_tool',
     }))).resolves.toMatchObject({
-      allowForTurn: false,
       kind: 'system',
       type: 'ask',
     })
@@ -299,7 +294,6 @@ describe('permissionEngine', () => {
       profile: 'full_access',
       toolName: 'bash',
     }))).resolves.toMatchObject({
-      allowForTurn: false,
       kind: 'shell',
       type: 'ask',
     })
@@ -308,7 +302,6 @@ describe('permissionEngine', () => {
       profile: 'full_access',
       toolName: 'bash',
     }))).resolves.toMatchObject({
-      allowForTurn: false,
       kind: 'shell',
       type: 'ask',
     })
@@ -317,7 +310,6 @@ describe('permissionEngine', () => {
       profile: 'full_access',
       toolName: 'bash',
     }))).resolves.toMatchObject({
-      allowForTurn: false,
       kind: 'shell',
       type: 'ask',
     })

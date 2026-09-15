@@ -36,7 +36,7 @@ describe('registerApprovalRpc', () => {
     registerApprovalRpc({ repository, rpc: harness.rpc, service })
 
     const decision = service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: {
         command: 'API_TOKEN=super-secret curl --token another-secret https://example.com',
       },
@@ -97,7 +97,7 @@ describe('registerApprovalRpc', () => {
       .toMatchObject({ code: 'VALIDATION_FAILED' })
 
     const renderDecision = service.request({
-      allowForTurn: false,
+      reuseScopes: [],
       arguments: { path: '/workspace/report.html' },
       kind: 'render',
       paths: {

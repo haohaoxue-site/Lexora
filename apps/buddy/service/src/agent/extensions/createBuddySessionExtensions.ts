@@ -12,6 +12,8 @@ import type { BuddyInputReferenceStore } from '../context/BuddyInputReference'
 import type { BuddyCapabilityFactory } from './BuddyCapability'
 import type { BuddyExtensionRunContextStore } from './BuddyExtensionRunContext'
 import type { BuddyInProcessExtension } from './BuddyInProcessExtension'
+import { ToolAuthorizationService } from '../../permissions/ToolAuthorizationService'
+import { ToolExecutionPermissions } from '../../permissions/ToolExecutionPermissions'
 import { SandboxDirectoryPermissions } from '../../sandbox/SandboxDirectoryPermissions'
 import { createShellCapability } from '../../sandbox/shellCapability'
 import { resolveShellExecution } from '../../sandbox/shellExecution'
@@ -58,11 +60,27 @@ export async function createBuddySessionExtensions(
   const sandboxDirectories = new SandboxDirectoryPermissions()
   const runContext: BuddyExtensionRunContextStore = { current: null }
   const inputReferences: BuddyInputReferenceStore = { pending: null }
+  const executionPermissions = new ToolExecutionPermissions()
+  const authorization = new ToolAuthorizationService({
+    applySandboxDirectory: (run, grant) => sandboxDirectories.grant(run, grant),
+    applyGrant: async proposal => applyGrantToSession(grants, await services.directoryGrants.grant(proposal)),
+    approvalAvailable: options.sessionMode === 'interactive',
+    approvalPolicy: options.approvalPolicy,
+    approvalService: services.approvalService,
+    cwd: options.canonicalRoot,
+    executionPermissions,
+    executionProfile: options.executionProfile,
+    getGrants: () => grants,
+    owner: options.spaceId
+      ? { id: options.spaceId, kind: 'space' }
+      : { id: options.conversationId, kind: 'conversation' },
+  })
   const capabilities = [...await services.createCapabilities({
     conversationId: options.conversationId,
     executionProfile: options.executionProfile,
     cwd: options.canonicalRoot,
     getRunId: () => runContext.current?.runId,
+    getExecutionGrants: toolCallId => [...grants, ...executionPermissions.get(runContext.current, toolCallId)],
     grants,
     sessionMode: options.sessionMode,
     signal: options.signal,
@@ -75,12 +93,7 @@ export async function createBuddySessionExtensions(
       getGrants: () => grants,
       resourceReadRoots: options.skillReadRoots ?? [],
       getRunContext: () => runContext.current,
-      approvalAvailable: options.sessionMode === 'interactive',
-      approvalPolicy: options.approvalPolicy,
-      owner: options.spaceId
-        ? { id: options.spaceId, kind: 'space' }
-        : { id: options.conversationId, kind: 'conversation' },
-      approvalService: services.approvalService,
+      authorization,
       sandbox: services.shellSandbox,
       directoryPermissions: sandboxDirectories,
     }))
@@ -92,14 +105,7 @@ export async function createBuddySessionExtensions(
     createInputReferenceExtension(inputReferences),
     ...sessionCapabilities.map(capability => capability.extension),
     createToolPolicyExtension({
-      applySandboxDirectory: (run, grant) => sandboxDirectories.grant(run, grant),
-      applyGrant: async (proposal) => {
-        const mutation = await services.directoryGrants.grant(proposal)
-        applyGrantToSession(grants, mutation)
-      },
-      approvalAvailable: options.sessionMode === 'interactive',
-      approvalPolicy: options.approvalPolicy,
-      approvalService: services.approvalService,
+      authorization,
       classifyTool: async (event, run) => {
         for (const capability of sessionCapabilities) {
           const classification = await capability.classify(event, run.signal)
@@ -108,13 +114,7 @@ export async function createBuddySessionExtensions(
         }
         return {}
       },
-      cwd: options.canonicalRoot,
-      executionProfile: options.executionProfile,
-      getGrants: () => grants,
       getRunContext: () => runContext.current,
-      owner: options.spaceId
-        ? { id: options.spaceId, kind: 'space' }
-        : { id: options.conversationId, kind: 'conversation' },
     }),
     createChangeCaptureExtension({
       conversationId: options.conversationId,
