@@ -6,6 +6,7 @@ import {
   BROWSER_ACT_TOOL_NAME,
   classifyBrowserTool,
 } from '../../../browser/browserToolContract'
+import { ToolAuthorizationService } from '../../../permissions/ToolAuthorizationService'
 import { ApprovalExpiredError } from '../../ApprovalService'
 
 const ACTION_INPUT = {
@@ -110,14 +111,16 @@ describe('browser approval policy', () => {
     }))
     const onAuthorized = vi.fn(async () => {})
     const extension = createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request: requestApproval },
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request: requestApproval },
+        cwd: '/workspace',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'full_access',
+        getGrants: () => [],
+      }),
       classifyTool: () => classification as BuddyToolClassificationResult,
-      cwd: '/workspace',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'full_access',
-      getGrants: () => [],
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized: onAuthorized,
@@ -135,7 +138,6 @@ describe('browser approval policy', () => {
     })).resolves.toBeUndefined()
 
     expect(requestApproval).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
-      allowForTurn: false,
       arguments: ACTION_INPUT,
       browser: BROWSER_REVIEW,
       kind: 'browser',
@@ -178,14 +180,16 @@ describe('browser approval policy', () => {
     }))
     const onAuthorized = vi.fn(async () => {})
     const extension = createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request: requestApproval },
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request: requestApproval },
+        cwd: '/workspace',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'workspace_write',
+        getGrants: () => [],
+      }),
       classifyTool: () => classification as BuddyToolClassificationResult,
-      cwd: '/workspace',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'workspace_write',
-      getGrants: () => [],
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized: onAuthorized,
@@ -229,14 +233,16 @@ describe('browser approval policy', () => {
     }))
     const onAuthorized = vi.fn(async () => {})
     const invoke = activate(createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request: requestApproval },
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request: requestApproval },
+        cwd: '/workspace',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'workspace_write',
+        getGrants: () => [],
+      }),
       classifyTool: () => classification as BuddyToolClassificationResult,
-      cwd: '/workspace',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'workspace_write',
-      getGrants: () => [],
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized: onAuthorized,
@@ -279,14 +285,16 @@ describe('browser approval policy', () => {
     })
     const onAuthorized = vi.fn(async () => {})
     const invoke = activate(createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request: requestApproval },
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request: requestApproval },
+        cwd: '/workspace',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'workspace_write',
+        getGrants: () => [],
+      }),
       classifyTool: () => classification as BuddyToolClassificationResult,
-      cwd: '/workspace',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'workspace_write',
-      getGrants: () => [],
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized: onAuthorized,

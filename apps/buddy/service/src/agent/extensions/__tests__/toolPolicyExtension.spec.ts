@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-
 import { ApprovalCancelledError } from '../../../approvals/ApprovalService'
+
 import { createToolClassificationFailure } from '../../../approvals/toolClassification'
+import { ToolAuthorizationService } from '../../../permissions/ToolAuthorizationService'
 import { createToolPolicyExtension } from '../toolPolicyExtension'
 
 describe('toolPolicyExtension always-confirm', () => {
@@ -16,13 +17,15 @@ describe('toolPolicyExtension always-confirm', () => {
     })
     let handler: ((event: unknown) => Promise<unknown>) | null = null
     const extension = createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request },
-      cwd: '/tmp',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'workspace_write',
-      getGrants: () => [{ canonicalRoot: '/tmp', grantId: 'workspace-1', kind: 'workspace' as const, root: '/tmp' }],
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request },
+        cwd: '/tmp',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'workspace_write',
+        getGrants: () => [{ canonicalRoot: '/tmp', grantId: 'workspace-1', kind: 'workspace' as const, root: '/tmp' }],
+      }),
       getRunContext: () => ({
         flushProjectedEvents: async () => {
           order.push('prepared')
@@ -47,7 +50,6 @@ describe('toolPolicyExtension always-confirm', () => {
 
     expect(order).toEqual(['prepared', 'approved', 'authorized'])
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
-      allowForTurn: true,
       shell: { cwd: '/tmp', reason: 'unknown-command' },
     }))
   })
@@ -69,14 +71,16 @@ describe('toolPolicyExtension always-confirm', () => {
     }
     let handler: ((event: unknown) => Promise<unknown>) | null = null
     const extension = createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request },
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request },
+        cwd: '/tmp',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'full_access',
+        getGrants: () => [],
+      }),
       classifyTool,
-      cwd: '/tmp',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'full_access',
-      getGrants: () => [],
       getRunContext: () => run,
     })
     extension.factory({
@@ -99,7 +103,6 @@ describe('toolPolicyExtension always-confirm', () => {
 
     expect(classifyTool).toHaveBeenCalledWith(event, run)
     expect(request).toHaveBeenCalledWith(expect.objectContaining({
-      allowForTurn: false,
       kind: 'shell',
     }))
   })
@@ -108,14 +111,16 @@ describe('toolPolicyExtension always-confirm', () => {
     const onToolExecutionAuthorized = vi.fn()
     let handler: ((event: unknown) => Promise<unknown>) | null = null
     const extension = createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request: vi.fn() },
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request: vi.fn() },
+        cwd: '/tmp',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'full_access',
+        getGrants: () => [],
+      }),
       classifyTool: () => createToolClassificationFailure('AUTOMATION_NOT_FOUND'),
-      cwd: '/tmp',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'full_access',
-      getGrants: () => [],
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized,
@@ -145,13 +150,15 @@ describe('toolPolicyExtension always-confirm', () => {
   it('preserves explicit approval failures and hides unexpected classifier errors', async () => {
     let approvalHandler: ((event: unknown) => Promise<unknown>) | null = null
     const approvalExtension = createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request: vi.fn().mockRejectedValue(new ApprovalCancelledError()) },
-      cwd: '/tmp',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'workspace_write',
-      getGrants: () => [{ canonicalRoot: '/tmp', grantId: 'workspace-1', kind: 'workspace' as const, root: '/tmp' }],
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request: vi.fn().mockRejectedValue(new ApprovalCancelledError()) },
+        cwd: '/tmp',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'workspace_write',
+        getGrants: () => [{ canonicalRoot: '/tmp', grantId: 'workspace-1', kind: 'workspace' as const, root: '/tmp' }],
+      }),
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized: async () => {},
@@ -174,16 +181,18 @@ describe('toolPolicyExtension always-confirm', () => {
 
     let unexpectedHandler: ((event: unknown) => Promise<unknown>) | null = null
     const unexpectedExtension = createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request: vi.fn() },
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request: vi.fn() },
+        cwd: '/tmp',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'full_access',
+        getGrants: () => [],
+      }),
       classifyTool: () => {
         throw new Error('private classifier details')
       },
-      cwd: '/tmp',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'full_access',
-      getGrants: () => [],
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized: async () => {},
@@ -213,14 +222,16 @@ describe('toolPolicyExtension always-confirm', () => {
     const classifyTool = vi.fn()
     let handler: ((event: unknown) => Promise<unknown>) | null = null
     const extension = createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request: vi.fn() },
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request: vi.fn() },
+        cwd: '/tmp',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'full_access',
+        getGrants: () => [],
+      }),
       classifyTool,
-      cwd: '/tmp',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'full_access',
-      getGrants: () => [],
       getRunContext: () => null,
     })
     extension.factory({
@@ -246,17 +257,19 @@ describe('toolPolicyExtension always-confirm', () => {
     const onToolExecutionDenied = vi.fn(async () => {})
     let handler: ((event: unknown) => Promise<unknown>) | null = null
     const extension = createToolPolicyExtension({
-      approvalAvailable: true,
-      owner: { id: 'conversation-1', kind: 'conversation' as const },
-      approvalService: { request: vi.fn() },
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        owner: { id: 'conversation-1', kind: 'conversation' as const },
+        approvalService: { request: vi.fn() },
+        cwd: '/tmp',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'read_only',
+        getGrants: () => [{ canonicalRoot: '/tmp', grantId: 'workspace-1', kind: 'workspace' as const, root: '/tmp' }],
+      }),
       classifyTool: () => ({
         access: 'write' as const,
         paths: [{ mode: 'create' as const, path: '/tmp/result.txt' }],
       }),
-      cwd: '/tmp',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'read_only',
-      getGrants: () => [{ canonicalRoot: '/tmp', grantId: 'workspace-1', kind: 'workspace' as const, root: '/tmp' }],
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized: async () => {},
@@ -293,30 +306,32 @@ describe('toolPolicyExtension always-confirm', () => {
     const onToolExecutionAuthorized = vi.fn(async () => {})
     let handler: ((event: unknown) => Promise<unknown>) | null = null
     const extension = createToolPolicyExtension({
-      applyGrant,
-      approvalAvailable: true,
-      approvalService: {
-        request: vi.fn(async () => ({
-          approvalId: 'approval-1',
-          decision: 'approved_for_turn' as const,
-        })),
-      },
-      cwd: '/tmp',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'workspace_write',
-      getGrants: () => [{
-        canonicalRoot: '/tmp',
-        grantId: 'workspace-1',
-        kind: 'workspace' as const,
-        root: '/tmp',
-      }],
+      authorization: new ToolAuthorizationService({
+        applyGrant,
+        approvalAvailable: true,
+        approvalService: {
+          request: vi.fn(async () => ({
+            approvalId: 'approval-1',
+            decision: 'approved_for_turn' as const,
+          })),
+        },
+        cwd: '/tmp',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'workspace_write',
+        getGrants: () => [{
+          canonicalRoot: '/tmp',
+          grantId: 'workspace-1',
+          kind: 'workspace' as const,
+          root: '/tmp',
+        }],
+        owner: { id: 'conversation-1', kind: 'conversation' },
+      }),
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized,
         runId: 'run-1',
         signal: new AbortController().signal,
       }),
-      owner: { id: 'conversation-1', kind: 'conversation' },
     })
     extension.factory({
       on: (_event: string, callback: (event: unknown) => Promise<unknown>) => {
@@ -339,25 +354,28 @@ describe('toolPolicyExtension always-confirm', () => {
     const onToolExecutionDenied = vi.fn(async () => {})
     let handler: ((event: unknown) => Promise<unknown>) | null = null
     const extension = createToolPolicyExtension({
-      applyGrant: vi.fn(async () => {
-        throw new Error('storage unavailable')
+      authorization: new ToolAuthorizationService({
+        applyGrant: vi.fn(async () => {
+          throw new Error('storage unavailable')
+        }),
+        approvalAvailable: true,
+        approvalService: {
+          request: vi.fn(async () => ({
+            approvalId: 'approval-1',
+            decision: 'approved_once' as const,
+          })),
+        },
+        cwd: '/tmp',
+        approvalPolicy: 'policy' as const,
+        executionProfile: 'workspace_write',
+        getGrants: () => [{
+          canonicalRoot: '/tmp',
+          grantId: 'workspace-1',
+          kind: 'workspace' as const,
+          root: '/tmp',
+        }],
+        owner: { id: 'conversation-1', kind: 'conversation' },
       }),
-      approvalAvailable: true,
-      approvalService: {
-        request: vi.fn(async () => ({
-          approvalId: 'approval-1',
-          decision: 'approved_once' as const,
-        })),
-      },
-      cwd: '/tmp',
-      approvalPolicy: 'policy' as const,
-      executionProfile: 'workspace_write',
-      getGrants: () => [{
-        canonicalRoot: '/tmp',
-        grantId: 'workspace-1',
-        kind: 'workspace' as const,
-        root: '/tmp',
-      }],
       getRunContext: () => ({
         flushProjectedEvents: async () => {},
         onToolExecutionAuthorized,
@@ -365,7 +383,6 @@ describe('toolPolicyExtension always-confirm', () => {
         runId: 'run-1',
         signal: new AbortController().signal,
       }),
-      owner: { id: 'conversation-1', kind: 'conversation' },
     })
     extension.factory({
       on: (_event: string, callback: (event: unknown) => Promise<unknown>) => {

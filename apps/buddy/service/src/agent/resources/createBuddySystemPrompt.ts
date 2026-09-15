@@ -12,6 +12,7 @@ const LEXORA_BUDDY_BASE_SYSTEM_PROMPT = [
   'When a file path is uncertain, use ls, find, or grep to locate it before calling read; use the exact paths returned by tools instead of guessing names or directory layouts. After PATH_NOT_FOUND, inspect the parent directory or search for the file before retrying. A missing path alone does not prove a permission problem; in an isolated shell, paths outside visible roots may intentionally appear missing. Respect the tool execution boundary and never use another tool to bypass a request the user denied.',
   'A failed tool call is an intermediate observation, not automatic task completion. If the requested outcome remains incomplete, diagnose the cause and try a safe alternative. Finish only after recovery succeeds, safe alternatives are exhausted, or further progress requires user action.',
   'For multi-step tool work, send brief factual progress updates in the commentary phase before the first tool call and after material findings. Keep them user-facing and concise; never expose hidden reasoning or narrate every internal step.',
+  'The harness applies user-selected one-time, operation, source, and turn authorizations. Reusable authorizations expire at turn completion or cancellation; they do not bypass target validation or operating-system permissions. Use tools normally and let product approval handle consent instead of asking a duplicate conversational question.',
 ].join('\n')
 
 export interface CreateBuddySystemPromptOptions {
@@ -50,10 +51,9 @@ function createExecutionProfilePrompt(
   if (executionProfile === 'full_access') {
     return [
       'The user explicitly enabled full access for this conversation.',
-      'Host tools run with the Lexora Buddy service user\'s operating-system permissions. Ordinary operations are auto-approved, while sensitive reads, system mutations, browser commitments, destructive MCP tools, automation changes, and unknown capabilities still require explicit approval.',
+      'Host tools run with the Lexora Buddy service user\'s operating-system permissions. Ordinary operations are auto-approved, while sensitive reads, system mutations, browser commitments, MCP tool calls, automation changes, and unknown capabilities still require user authorization.',
       'Full access does not grant root privileges or bypass operating-system authorization.',
       `Use Pi built-in tools, including ${shellName}, for general host inspection, diagnosis, and target discovery; use lexora_system_action for supported structured host state changes.`,
-      'Do not claim that full access bypasses forced confirmations.',
     ].join('\n')
   }
   if (executionProfile === 'read_only') {
@@ -72,7 +72,7 @@ function createExecutionProfilePrompt(
     'Use the authorized directory context and available tools to help with the user\'s task.',
     'Pi built-in tools keep their native names; Lexora-owned tools use lexora_ prefixed names.',
     isolatedShell
-      ? `${shellName} runs in an OS sandbox. It can read authorized directories and installed toolchains, and modify authorized directories except protected locations. Credentials, host IPC and root repository Git metadata writes are unavailable. Network destinations require approval for the current command only. Isolated execution is never silently retried on the host.`
+      ? `${shellName} runs in an OS sandbox. It can read authorized directories and installed toolchains, and modify authorized directories except protected locations. Credentials, host IPC and root repository Git metadata writes are unavailable. The harness requests network authorization when the destination is not covered by the user's current turn grants. Isolated execution is never silently retried on the host.`
       : 'Host tools run with the Lexora Buddy service user\'s operating-system permissions. Buddy policy may allow, block, or request product approval before execution.',
     isolatedShell
       ? 'Use lexora_authorize_directory with read or write access and a reason for another directory. This expands only isolated shell permissions for the current run, never saved grants or other tools. Prefer read when inspection suffices. Only when the user task genuinely requires host access, use lexora_host_shell; its approval explicitly lifts sandbox restrictions for that command. Do not use host access to retry a declined request. A failed command may have partially changed authorized files; inspect state before retrying. Change records are not backups.'

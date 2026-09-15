@@ -1,16 +1,13 @@
-import type { BuddyApprovalPolicy } from '../../../shared/permissions/approvalPolicy'
 import type { BuddyCapability } from '../agent/extensions/BuddyCapability'
 import type { BuddyExtensionRunContext } from '../agent/extensions/BuddyExtensionRunContext'
-import type { ApprovalService } from '../approvals/ApprovalService'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
-import type { GrantOwner } from '../permissions/permissionContract'
+import type { ToolAuthorizationService } from '../permissions/ToolAuthorizationService'
 import type { SandboxDirectoryPermissions } from './SandboxDirectoryPermissions'
 import type { ShellExecution } from './shellExecution'
 import type { ShellSandboxClient } from './ShellSandboxClient'
 import { createBashToolDefinition, createPowerShellToolDefinition, defineTool } from '@earendil-works/pi-coding-agent'
 import { Type } from 'typebox'
 import { ShellSandboxError } from '../../../shared/permissions/shellSandbox'
-import { PermissionEngine } from '../permissions/PermissionEngine'
 
 export const SHELL_SANDBOX_EXTENSION = 'lexora-shell-sandbox'
 
@@ -20,14 +17,10 @@ export function createShellCapability(options: {
   getGrants: () => readonly DirectoryGrant[]
   resourceReadRoots?: readonly string[]
   getRunContext: () => BuddyExtensionRunContext | null
-  approvalAvailable: boolean
-  approvalPolicy: BuddyApprovalPolicy
-  owner: GrantOwner
-  approvalService: Pick<ApprovalService, 'request'>
+  authorization: ToolAuthorizationService
   sandbox: Pick<ShellSandboxClient, 'exec'> | undefined
   directoryPermissions: SandboxDirectoryPermissions
 }): BuddyCapability {
-  const engine = new PermissionEngine()
   const shellName = options.execution.dialect
   const createShell = shellName === 'powershell' ? createPowerShellToolDefinition : createBashToolDefinition
   const directoryParameters = Type.Object({
@@ -78,33 +71,12 @@ export function createShellCapability(options: {
                 }, { ...execOptions, signal: executionSignal }, async (target) => {
                   if (executionSignal.aborted)
                     return false
-                  const decision = await engine.decide({
-                    access: 'network',
-                    approvalAvailable: options.approvalAvailable,
-                    approvalPolicy: options.approvalPolicy,
-                    arguments: parameters,
-                    cwd: options.cwd,
-                    forceAsk: true,
-                    grants: options.getGrants(),
-                    owner: options.owner,
-                    profile: options.execution.profile,
-                    toolName: shellName,
-                  })
-                  if (decision.type !== 'ask')
-                    return decision.type === 'allow'
-                  await run.flushProjectedEvents()
-                  const approval = await options.approvalService.request({
-                    allowForTurn: false,
-                    arguments: parameters,
-                    kind: 'network',
-                    network: target,
-                    runId: run.runId,
-                    signal: executionSignal,
-                    summary: decision.summary,
+                  const reason = await options.authorization.authorize({
+                    input: parameters,
                     toolCallId,
                     toolName: shellName,
-                  })
-                  return approval.decision === 'approved_once'
+                  }, run, { access: 'network', requireApproval: true }, { network: target, signal: executionSignal })
+                  return reason === null
                 }),
               },
             })
@@ -119,8 +91,8 @@ export function createShellCapability(options: {
             ...native,
             name: 'lexora_host_shell',
             label: 'Host shell',
-            description: 'Run a command OUTSIDE the sandbox with the desktop service user permissions, including host files, credentials, network and desktop IPC. Requires separate explicit approval every time. Use only when isolation prevents an operation required by the user, never to evade a declined request. Supply command and optional timeout in seconds.',
-            promptSnippet: 'Run a separately approved host command outside the sandbox',
+            description: 'Run a command OUTSIDE the sandbox with the desktop service user permissions, including host files, credentials, network and desktop IPC. Requires user authorization; reusable grants expire with the current run. Use only when isolation prevents an operation required by the user, never to evade a declined request. Supply command and optional timeout in seconds.',
+            promptSnippet: 'Run an authorized host command outside the sandbox',
             promptGuidelines: [],
           })
         }

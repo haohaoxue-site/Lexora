@@ -221,7 +221,7 @@ describe('buddy runtime cross-subsystem contract', () => {
     const approvals = createApprovalRepository(database)
     const approvalService = new ApprovalService({ eventLog, repository: approvals })
     const pendingDecision = approvalService.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'python transform.py' },
       kind: 'shell',
       runId: 'run-1',

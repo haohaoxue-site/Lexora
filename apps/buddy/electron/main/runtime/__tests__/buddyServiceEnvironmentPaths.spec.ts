@@ -35,7 +35,7 @@ describe('service environment and sensitive path policy', () => {
       toolName: 'read',
     }
     expect(environment).not.toHaveProperty('OPENAI_API_KEY')
-    await expect(engine.decide(request)).resolves.toMatchObject({ type: 'ask', allowForTurn: false })
+    await expect(engine.decide(request)).resolves.toMatchObject({ type: 'ask' })
     await expect(engine.decide({ ...request, toolName: 'write' }))
       .resolves
       .toMatchObject({ type: 'deny', code: 'SENSITIVE_PATH' })

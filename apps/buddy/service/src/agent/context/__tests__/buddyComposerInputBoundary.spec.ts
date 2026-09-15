@@ -13,6 +13,7 @@ import { estimateTokens, ModelRuntime } from '@earendil-works/pi-coding-agent'
 import { Type } from 'typebox'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createOutputPresentationExtension } from '../../../artifacts/outputPresentationExtension'
+import { ToolAuthorizationService } from '../../../permissions/ToolAuthorizationService'
 import { createInputReferenceExtension } from '../../extensions/inputReferenceExtension'
 import { createToolPolicyExtension } from '../../extensions/toolPolicyExtension'
 import { createIsolatedBuddySession as createBuddySession } from '../../sessions/__tests__/isolatedBuddySession'
@@ -532,14 +533,16 @@ async function createFixture(options: {
     inProcessExtensions: [
       ...options.approvalDecision
         ? [createToolPolicyExtension({
-            approvalAvailable: true,
-            approvalPolicy: 'policy',
-            approvalService: { request: async () => ({ approvalId: 'offline-approval', decision: options.approvalDecision! }) },
-            cwd: root,
-            executionProfile: 'workspace_write',
-            getGrants: () => [{ canonicalRoot: root, root, grantId: 'workspace', kind: 'workspace' }],
+            authorization: new ToolAuthorizationService({
+              approvalAvailable: true,
+              approvalPolicy: 'policy',
+              approvalService: { request: async () => ({ approvalId: 'offline-approval', decision: options.approvalDecision! }) },
+              cwd: root,
+              executionProfile: 'workspace_write',
+              getGrants: () => [{ canonicalRoot: root, root, grantId: 'workspace', kind: 'workspace' }],
+              owner: { kind: 'conversation', id: 'conversation-1' },
+            }),
             getRunContext: () => runContext.current,
-            owner: { kind: 'conversation', id: 'conversation-1' },
           })]
         : [],
       createInputReferenceExtension(inputReferences),

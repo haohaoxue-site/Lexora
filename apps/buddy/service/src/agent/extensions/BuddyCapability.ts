@@ -20,6 +20,7 @@ export interface BuddyCapabilityContext {
   cwd: string
   getRunId: () => string | undefined
   grants: readonly DirectoryGrant[]
+  getExecutionGrants?: (toolCallId: string) => readonly DirectoryGrant[]
   sessionMode: BuddySessionMode
   signal: AbortSignal
 }

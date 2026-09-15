@@ -11,6 +11,7 @@ import { createEstimatedContextUsage } from '../../../agent/context/contextUsage
 import { createToolDiscoveryCapability } from '../../../agent/extensions/discovery/toolDiscoveryExtension'
 import { createToolPolicyExtension } from '../../../agent/extensions/toolPolicyExtension'
 import { createIsolatedBuddyContextSnapshot, createIsolatedBuddySession } from '../../../agent/sessions/__tests__/isolatedBuddySession'
+import { ToolAuthorizationService } from '../../../permissions/ToolAuthorizationService'
 import { createConnectorRepository } from '../../../storage/connectorRepository'
 import { openBuddyDatabase } from '../../../storage/database'
 import { McpConnectorService } from '../McpConnectorService'
@@ -85,19 +86,21 @@ it('advertises enabled MCP capabilities, discovers Chinese queries, and calls th
     const discovery = createToolDiscoveryCapability([mcp.disclosure!])
     const approvals: string[] = []
     const policy = createToolPolicyExtension({
-      approvalAvailable: true,
-      approvalPolicy: 'policy',
-      executionProfile: 'workspace_write',
-      cwd: root,
-      owner: { id: 'conversation-1', kind: 'conversation' },
-      getGrants: () => [],
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        approvalPolicy: 'policy',
+        executionProfile: 'workspace_write',
+        cwd: root,
+        owner: { id: 'conversation-1', kind: 'conversation' },
+        getGrants: () => [],
+        approvalService: { request: async (input) => {
+          approvals.push(input.toolName)
+          expect(calls).toEqual([])
+          return { approvalId: 'approval-1', decision: 'approved_once' }
+        } },
+      }),
       getRunContext: () => ({ runId: 'run-1', signal: new AbortController().signal, flushProjectedEvents: async () => {}, onToolExecutionAuthorized: async () => {} }),
       classifyTool: async event => await mcp.classify(event, new AbortController().signal) ?? { access: 'read' },
-      approvalService: { request: async (input) => {
-        approvals.push(input.toolName)
-        expect(calls).toEqual([])
-        return { approvalId: 'approval-1', decision: 'approved_once' }
-      } },
     })
     const runtime = await ModelRuntime.create({ credentials: new InMemoryCredentialStore(), modelsPath: null, refreshOnCreate: false })
     const model = runtime.getModels()[0]!

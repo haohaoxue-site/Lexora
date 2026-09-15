@@ -60,11 +60,13 @@ export function createBuddyCapabilityFactory(
       createBrowserCapability({
         conversationId: context.conversationId,
         getGrants: () => context.grants,
+        getExecutionGrants: context.getExecutionGrants,
         host: services.browserHost,
       }),
       createWebCapability({ service: services.webService, conversationId: context.conversationId }),
       createImageGenerationCapability({
         getRunId: context.getRunId,
+        getExecutionGrants: context.getExecutionGrants,
         service: new ImageGenerationService({
           artifactService: services.artifactService,
           attachmentService: services.attachmentService,

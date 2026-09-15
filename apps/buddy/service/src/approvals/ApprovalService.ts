@@ -28,7 +28,7 @@ export type ApprovalRequestResult
     | { decision: `approved_by_${ApprovalReuseScope}`, sourceApprovalId: string }
 
 export interface ApprovalRequest {
-  allowForTurn: boolean
+  reuseScopes?: readonly ApprovalReuseScope[]
   arguments: unknown
   automation?: AutomationApprovalReviewInput
   browser?: BrowserApprovalReviewInput
@@ -41,6 +41,7 @@ export interface ApprovalRequest {
   shell?: ShellApprovalContext
   runId: string
   signal: AbortSignal
+  runSignal?: AbortSignal
   summary: string
   systemAction?: SystemActionApprovalReviewInput
   toolCallId: string
@@ -60,6 +61,7 @@ export interface ApprovalServiceOptions {
 }
 
 interface ApprovalWaiter {
+  authorizationSignal: AbortSignal
   authorizationKeys: ApprovalAuthorizationKeys
   reuseScopes: ReadonlySet<ApprovalReuseScope>
   cleanup: () => void
@@ -81,6 +83,8 @@ export class ApprovalService {
 
   readonly #resolving = new Map<string, Promise<unknown>>()
   readonly #waiters = new Map<string, ApprovalWaiter>()
+  readonly #queues = new Map<string, Promise<void>>()
+  readonly #runLifetimes = new Map<string, () => void>()
 
   constructor(options: ApprovalServiceOptions) {
     this.#approvalTimeoutMs = options.approvalTimeoutMs ?? APPROVAL_WAIT_TIMEOUT_MS
@@ -90,10 +94,26 @@ export class ApprovalService {
   }
 
   async request(input: ApprovalRequest): Promise<ApprovalRequestResult> {
+    const previous = this.#queues.get(input.runId) ?? Promise.resolve()
+    let started = false
+    const pending = previous.then(() => {
+      started = true
+      return this.#request(input)
+    })
+    const settled = pending.then(() => {}, () => {})
+    this.#queues.set(input.runId, settled)
+    void settled.then(() => {
+      if (this.#queues.get(input.runId) === settled)
+        this.#queues.delete(input.runId)
+    })
+    return waitForApproval(pending, input.signal, () => started)
+  }
+
+  async #request(input: ApprovalRequest): Promise<ApprovalRequestResult> {
     if (input.signal.aborted)
       throw new ApprovalCancelledError()
-    const reuseScopes = approvalReuseScopes(input.allowForTurn)
     const authorizationKeys = createApprovalAuthorizationKeys(input, input.reuse)
+    const reuseScopes = approvalReuseScopes(authorizationKeys, input.reuseScopes)
     const reused = this.#findAuthorization(input.runId, reuseScopes, authorizationKeys)
     if (reused) {
       await this.#eventLog.append({
@@ -117,7 +137,7 @@ export class ApprovalService {
       id: randomUUID(),
       kind: input.kind,
       payload: createApprovalReviewPayload({
-        allowForTurn: input.allowForTurn,
+        allowForTurn: reuseScopes.includes('turn'),
         arguments: input.arguments,
         automation: input.automation,
         browser: input.browser,
@@ -141,6 +161,7 @@ export class ApprovalService {
     let timer: ReturnType<typeof setTimeout> | null = null
     const decision = new Promise<ApprovalRequestResult>((resolve, reject) => {
       this.#waiters.set(approval.id, {
+        authorizationSignal: input.runSignal ?? input.signal,
         authorizationKeys,
         cleanup: () => {
           if (timer)
@@ -184,6 +205,8 @@ export class ApprovalService {
   }
 
   clearRunAuthorizations(runId: string): void {
+    this.#runLifetimes.get(runId)?.()
+    this.#runLifetimes.delete(runId)
     for (const authorizations of this.#authorizations.values())
       authorizations.delete(runId)
   }
@@ -207,16 +230,18 @@ export class ApprovalService {
     const approval = this.#requireApproval(input.id)
     if (approval.status !== decision)
       throw new ApprovalResolutionError()
-    if (approvedScope && waiter && !waiter.signal.aborted) {
+    if (approvedScope && waiter && !waiter.signal.aborted && !waiter.authorizationSignal.aborted) {
       this.#storeAuthorization(
         approvedScope,
         pending.runId,
-        approvedScope === 'turn' ? pending.runId : waiter.authorizationKeys[approvedScope],
+        approvedScope === 'turn' ? pending.runId : waiter.authorizationKeys[approvedScope]!,
         pending.id,
       )
-      waiter.signal.addEventListener('abort', () => {
-        this.clearRunAuthorizations(pending.runId)
-      }, { once: true })
+      if (!this.#runLifetimes.has(pending.runId)) {
+        const clear = () => this.clearRunAuthorizations(pending.runId)
+        waiter.authorizationSignal.addEventListener('abort', clear, { once: true })
+        this.#runLifetimes.set(pending.runId, () => waiter.authorizationSignal.removeEventListener('abort', clear))
+      }
     }
     waiter?.resolve({
       approvalId: pending.id,
@@ -322,6 +347,8 @@ export class ApprovalService {
   ): { scope: ApprovalReuseScope, sourceApprovalId: string } | null {
     for (const scope of scopes) {
       const key = scope === 'turn' ? runId : keys[scope]
+      if (!key)
+        continue
       const sourceApprovalId = this.#authorizations.get(scope)?.get(runId)?.get(key)
       if (sourceApprovalId)
         return { scope, sourceApprovalId }
@@ -347,6 +374,19 @@ function readApprovedScope(decision: ApprovalResolutionDecision): ApprovalReuseS
     return null
   const scope = decision.slice('approved_for_'.length)
   return scope === 'operation' || scope === 'source' || scope === 'turn' ? scope : null
+}
+
+function waitForApproval<T>(pending: Promise<T>, signal: AbortSignal, started: () => boolean): Promise<T> {
+  if (signal.aborted)
+    return Promise.reject(new ApprovalCancelledError())
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      if (!started())
+        reject(new ApprovalCancelledError())
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    void pending.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort))
+  })
 }
 
 export class ApprovalCancelledError extends Error implements ToolCallBlockingError {

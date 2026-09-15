@@ -1,103 +1,94 @@
 import type { ApprovalReuseScope } from '../../../shared/permissions/approvalReviewPayload'
 import type { ApprovalRequest } from './ApprovalService'
 import { createHash } from 'node:crypto'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 import { APPROVAL_REUSE_SCOPES } from '../../../shared/permissions/approvalReviewPayload'
 
 export interface ApprovalAuthorizationKeys {
   operation: string
-  source: string
+  source?: string
 }
 
 export interface ApprovalAuthorizationOverride {
   operation: readonly unknown[]
-  source: readonly unknown[]
+  source?: readonly unknown[]
 }
 
-export function approvalReuseScopes(enabled: boolean): readonly ApprovalReuseScope[] {
-  return enabled ? APPROVAL_REUSE_SCOPES : []
+export function approvalReuseScopes(keys: ApprovalAuthorizationKeys, scopes: readonly ApprovalReuseScope[] = APPROVAL_REUSE_SCOPES): readonly ApprovalReuseScope[] {
+  return APPROVAL_REUSE_SCOPES.filter(scope => scopes.includes(scope) && (scope !== 'source' || keys.source !== undefined))
 }
 
-export function createApprovalAuthorizationKeys(
-  input: Pick<ApprovalRequest, 'arguments' | 'cwd' | 'kind' | 'paths' | 'shell' | 'toolName'>,
-  override?: ApprovalAuthorizationOverride,
-): ApprovalAuthorizationKeys {
-  if (override) {
-    return {
-      operation: digest(['operation', ...override.operation]),
-      source: digest(['source', ...override.source]),
-    }
+export function createApprovalAuthorizationKeys(input: ApprovalRequest, override = input.reuse): ApprovalAuthorizationKeys {
+  if (override)
+    return keys([input.kind, ...override.operation], override.source && [input.kind, ...override.source])
+
+  if (input.network) {
+    const target = ['sandbox-network', input.network.host.toLowerCase().replace(/\.$/, ''), input.network.port]
+    return keys([...target, input.cwd, command(input)], target)
   }
+  if (input.sandboxDirectory)
+    return keys(['sandbox-directory', input.sandboxDirectory.path, input.sandboxDirectory.access])
 
-  const source = [input.kind, input.toolName, input.shell?.boundary ?? null]
   if (input.kind === 'shell') {
-    return {
-      operation: digest([
-        input.kind,
-        input.toolName,
-        input.shell?.cwd ?? null,
-        normalizeCommand(readString(input.arguments, 'command')),
-      ]),
-      source: digest(source),
-    }
+    const source = ['shell', input.toolName, input.shell?.boundary ?? 'host', input.shell?.cwd ?? input.cwd]
+    return keys([...source, command(input)], source)
   }
-
   if (input.paths?.targets.length) {
-    return {
-      operation: digest([
-        input.kind,
-        input.toolName,
-        input.paths.access,
-        [...input.paths.targets].map(target => normalizePath(target.path, input.cwd)).sort(),
-      ]),
-      source: digest(source),
-    }
+    const paths = input.paths.targets.map(target => resolve(input.cwd ?? '', target.path)).sort()
+    const source = input.paths.targets.some(target => target.zone === 'sensitive')
+      ? undefined
+      : ['paths', input.paths.access, input.paths.grant?.root ?? [...new Set(paths.map(path => dirname(path)))].sort()]
+    return keys(['paths', input.toolName, input.paths.access, paths], source)
   }
-
+  if (input.browser) {
+    const review = input.browser
+    const source = ['browser', review.sessionId, review.origin]
+    return keys([...source, review.pageId, review.documentRevision, review.actionDigest], source)
+  }
+  if (input.systemAction) {
+    const target = readRecord(input.arguments).target
+    const source = ['system', target, input.systemAction.target]
+    return keys([...source, input.systemAction.action], source)
+  }
+  if (input.automation) {
+    const args = readRecord(input.arguments)
+    const id = args.automationId ?? readRecord(args.draft).id
+    return keys(['automation', args], typeof id === 'string' ? ['automation', id] : undefined)
+  }
   if (input.kind === 'network') {
-    return {
-      operation: digest([
-        input.kind,
-        input.toolName,
-        readString(input.arguments, 'provider'),
-        normalizeNetworkTarget(readString(input.arguments, 'query') || readString(input.arguments, 'url')),
-      ]),
-      source: digest(source),
+    const args = readRecord(input.arguments)
+    const provider = args.provider ?? 'auto'
+    if (input.toolName === 'lexora_web_search')
+      return keys(['search', provider, args.query], ['search', provider])
+    if (typeof args.url === 'string') {
+      try {
+        const url = new URL(args.url)
+        url.hash = ''
+        return keys(['network', input.toolName, provider, url.href], ['network', input.toolName, provider, url.origin])
+      }
+      catch {}
     }
   }
+  return keys([input.kind, input.toolName, input.arguments])
+}
 
-  return {
-    operation: digest([input.kind, input.toolName]),
-    source: digest(source),
-  }
+function keys(operation: readonly unknown[], source?: readonly unknown[]): ApprovalAuthorizationKeys {
+  return { operation: digest(operation), ...(source ? { source: digest(source) } : {}) }
 }
 
 function digest(value: readonly unknown[]): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex')
+  return createHash('sha256').update(JSON.stringify(value, (_key, entry: unknown) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+      return entry
+    return Object.fromEntries(Object.entries(entry).sort(([left], [right]) => left.localeCompare(right)))
+  })).digest('hex')
 }
 
-function normalizeCommand(command: string): string {
-  return command.replace(/\r\n/g, '\n').trim()
+function command(input: ApprovalRequest): string {
+  const value = readRecord(input.arguments).command
+  return typeof value === 'string' ? value.replace(/\r\n/g, '\n').trim() : ''
 }
 
-function normalizePath(path: string, cwd?: string): string {
-  return cwd ? resolve(cwd, path) : path
-}
-
-function normalizeNetworkTarget(target: string): string {
-  try {
-    const url = new URL(target)
-    url.hash = ''
-    return url.toString()
-  }
-  catch {
-    return target.trim()
-  }
-}
-
-function readString(value: unknown, key: string): string {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
-    return ''
-  const entry = (value as Record<string, unknown>)[key]
-  return typeof entry === 'string' ? entry : ''
+function readRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }

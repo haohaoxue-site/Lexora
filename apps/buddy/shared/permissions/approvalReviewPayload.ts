@@ -101,14 +101,14 @@ const browserApprovalOriginSchema = z.union([
 
 export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
   sandboxDirectoryRequestSchema.extend({
-    allowForTurn: z.literal(false),
+    allowForTurn: z.boolean().default(false),
     card: z.literal('sandbox-directory'),
     reuseScopes: approvalReuseScopesSchema.optional(),
     scope: z.literal('run'),
     toolName: z.literal('lexora_authorize_directory'),
   }).strict(),
   sandboxNetworkTargetSchema.extend({
-    allowForTurn: z.literal(false),
+    allowForTurn: z.boolean().default(false),
     card: z.literal('sandbox-network'),
     command: z.string().max(MAX_COMMAND_REVIEW_LENGTH),
     reuseScopes: approvalReuseScopesSchema.optional(),
@@ -193,7 +193,7 @@ export const approvalReviewPayloadSchema = z.discriminatedUnion('card', [
   z.object({
     action: z.enum(['click', 'press']),
     actionDigest: z.string().regex(/^[a-f0-9]{64}$/),
-    allowForTurn: z.literal(false),
+    allowForTurn: z.boolean().default(false),
     card: z.literal('browser-action'),
     documentRevision: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     effect: browserApprovalEffectSchema.nullable(),
@@ -285,7 +285,7 @@ export function createApprovalReviewPayload(
     return approvalReviewPayloadSchema.parse({
       ...withoutReuseScopes(input.sandboxDirectory),
       reason: redactSensitiveText(input.sandboxDirectory.reason),
-      allowForTurn: false,
+      allowForTurn: input.allowForTurn,
       card: 'sandbox-directory',
       ...reuseScopes,
       scope: 'run',
@@ -295,7 +295,7 @@ export function createApprovalReviewPayload(
   if (input.kind === 'network' && input.network) {
     return approvalReviewPayloadSchema.parse({
       ...withoutReuseScopes(input.network),
-      allowForTurn: false,
+      allowForTurn: input.allowForTurn,
       card: 'sandbox-network',
       command: redactShellCommand(readString(input.arguments, 'command')),
       ...reuseScopes,

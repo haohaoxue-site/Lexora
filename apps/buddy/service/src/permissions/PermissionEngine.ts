@@ -145,7 +145,6 @@ export class PermissionEngine {
       return deny('INVALID_PATH', 'invalid')
     const metadata = await stat(path.canonicalPath, { bigint: true })
     return finalizeDecision(request, ask({
-      allowForTurn: false,
       kind: input.access,
       sandboxDirectory: { access: input.access, path: path.canonicalPath, reason: input.reason, device: String(metadata.dev), inode: String(metadata.ino) },
       summary: 'Expand isolated shell directory access for this run only',
@@ -201,7 +200,6 @@ export class PermissionEngine {
     if (classifications.some(entry => entry.zone === 'sensitive'))
       return deny('SENSITIVE_PATH', 'sensitive')
     return ask({
-      allowForTurn: false,
       kind: request.approval?.kind ?? 'system',
       summary: request.approval?.summary ?? 'Use a tool with unknown local side effects',
     })
@@ -260,7 +258,6 @@ export class PermissionEngine {
           return this.#forcedShellAsk(request, shell.type === 'ask' ? shell.reason : undefined)
         return forceAsk
           ? ask({
-              allowForTurn: false,
               kind: request.approval?.kind ?? approvalKindFor(access),
               paths: toDecisionPaths(classifications),
               summary: request.approval?.summary ?? summaryFor(access),
@@ -268,7 +265,6 @@ export class PermissionEngine {
           : allow()
       case 'ask':
         return ask({
-          allowForTurn: !forceAsk,
           kind: request.approval?.kind ?? approvalKindFor(access),
           paths: toDecisionPaths(classifications),
           summary: request.approval?.summary ?? summaryFor(access),
@@ -287,7 +283,6 @@ export class PermissionEngine {
         if (grants.length > 1)
           return deny('MULTIPLE_DIRECTORY_GRANTS_REQUIRED', 'invalid')
         return ask({
-          allowForTurn: !forceAsk,
           ...(grants[0]
             ? { grant: grants[0] }
             : classification
@@ -312,7 +307,6 @@ export class PermissionEngine {
       return request.profile === 'full_access' && !request.forceAsk
         ? allow()
         : ask({
-            allowForTurn: !request.forceAsk,
             kind: request.approval?.kind ?? 'system',
             summary: request.approval?.summary ?? summaryFor('execute'),
           })
@@ -328,7 +322,6 @@ export class PermissionEngine {
     if (request.profile === 'full_access' && !request.forceAsk)
       return allow()
     return ask({
-      allowForTurn: !request.forceAsk,
       kind: 'shell',
       shell: { cwd: request.cwd, reason: request.forceAsk ? 'forced-confirmation' : decision.reason ?? 'unknown-command' },
       summary: request.approval?.summary ?? 'Run a host shell command',
@@ -337,7 +330,6 @@ export class PermissionEngine {
 
   #forcedShellAsk(request: PermissionRequest, reason: ShellApprovalReason = 'forced-confirmation'): PermissionDecision {
     return ask({
-      allowForTurn: false,
       kind: 'shell',
       shell: { cwd: request.cwd, reason },
       summary: request.approval?.summary ?? 'Run a host shell command',
@@ -468,7 +460,7 @@ function toDecisionPaths(
   classifications: readonly PathClassification[],
 ): readonly { path: string, zone: PathClassification['zone'] }[] | undefined {
   const paths = classifications.map(classification => ({
-    path: classification.requestedPath,
+    path: classification.canonicalPath,
     zone: classification.zone,
   }))
   return paths.length > 0 ? paths : undefined

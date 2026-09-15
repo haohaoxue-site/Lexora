@@ -21,7 +21,7 @@ const BROWSER_REVIEW = {
 }
 
 describe('browser approval review payload', () => {
-  it('creates a dedicated card that cannot authorize the rest of the turn', () => {
+  it('reads existing one-time reviews and supports explicit reusable scopes', () => {
     const payload = createApprovalReviewPayload({
       allowForTurn: false,
       arguments: { action: { kind: 'click', ref: 'e1' } },
@@ -40,7 +40,8 @@ describe('browser approval review payload', () => {
     expect(approvalReviewPayloadSchema.safeParse({
       ...payload,
       allowForTurn: true,
-    }).success).toBe(false)
+      reuseScopes: ['operation', 'source', 'turn'],
+    }).success).toBe(true)
   })
 
   it('rejects private input outside the browser review contract', () => {

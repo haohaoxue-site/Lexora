@@ -45,7 +45,7 @@ export class ImageGenerationService {
     return this.#options.imageGenerationGateway.supports(model)
   }
 
-  async generate(input: GenerateConversationImageInput, model: Model<Api>, signal: AbortSignal) {
+  async generate(input: GenerateConversationImageInput, model: Model<Api>, signal: AbortSignal, grants = this.#options.grants) {
     signal.throwIfAborted()
     if (!this.supports(model))
       throw new ImageGenerationError('IMAGE_GENERATION_UNSUPPORTED')
@@ -63,7 +63,7 @@ export class ImageGenerationService {
     const artifacts = await this.#options.artifactService.registerGeneratedImages({
       conversationId: this.#options.conversationId,
       cwd: this.#options.cwd,
-      grants: this.#options.grants,
+      grants,
       images: generated.images,
       outputPath: input.outputPath.trim(),
       sourceArtifactId: references.artifactIds.at(-1) ?? null,

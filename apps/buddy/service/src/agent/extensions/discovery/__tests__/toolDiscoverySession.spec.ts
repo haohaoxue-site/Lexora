@@ -7,6 +7,7 @@ import { createAssistantMessageEventStream, InMemoryCredentialStore } from '@ear
 import { ModelRuntime } from '@earendil-works/pi-coding-agent'
 import { Type } from 'typebox'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ToolAuthorizationService } from '../../../../permissions/ToolAuthorizationService'
 import { createEstimatedContextUsage } from '../../../context/contextUsageBreakdown'
 import { createIsolatedBuddyContextSnapshot as createBuddyContextSnapshot, createIsolatedBuddySession as createBuddySession } from '../../../sessions/__tests__/isolatedBuddySession'
 import { createToolPolicyExtension } from '../../toolPolicyExtension'
@@ -80,12 +81,19 @@ describe('real Pi tool discovery loop', () => {
     const approvals: { toolName: string, arguments: unknown }[] = []
     const authorized: string[] = []
     const policy = createToolPolicyExtension({
-      approvalAvailable: true,
-      approvalPolicy: 'policy',
-      executionProfile: 'full_access',
-      cwd: root,
-      owner: { id: 'conversation-1', kind: 'conversation' },
-      getGrants: () => [],
+      authorization: new ToolAuthorizationService({
+        approvalAvailable: true,
+        approvalPolicy: 'policy',
+        executionProfile: 'full_access',
+        cwd: root,
+        owner: { id: 'conversation-1', kind: 'conversation' },
+        getGrants: () => [],
+        approvalService: { request: async (input) => {
+          approvals.push({ toolName: input.toolName, arguments: input.arguments })
+          await expect(readFile(join(root, 'result.txt'))).rejects.toMatchObject({ code: 'ENOENT' })
+          return { approvalId: 'approval-1', decision }
+        } },
+      }),
       getRunContext: () => ({
         runId: 'run-1',
         signal: new AbortController().signal,
@@ -95,11 +103,6 @@ describe('real Pi tool discovery loop', () => {
       classifyTool: event => event.toolName === name
         ? { access: 'write', paths: [{ path: join(root, 'result.txt'), mode: 'create' }], forceAsk: true }
         : { access: 'read', paths: [] },
-      approvalService: { request: async (input) => {
-        approvals.push({ toolName: input.toolName, arguments: input.arguments })
-        await expect(readFile(join(root, 'result.txt'))).rejects.toMatchObject({ code: 'ENOENT' })
-        return { approvalId: 'approval-1', decision }
-      } },
     })
     let request = 0
     vi.spyOn(runtime, 'streamSimple').mockImplementation((model) => {

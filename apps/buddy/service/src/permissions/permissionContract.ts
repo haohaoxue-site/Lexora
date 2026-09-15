@@ -54,7 +54,6 @@ export interface GrantProposal {
 
 export type PermissionDecision
   = {
-    allowForTurn: boolean
     grant?: GrantProposal
     kind: ApprovalReviewKind
     paths?: readonly { path: string, zone: PathZone }[]
@@ -99,7 +98,6 @@ export function deny(
 }
 
 export function ask(input: {
-  allowForTurn?: boolean
   grant?: GrantProposal
   kind: ApprovalReviewKind
   paths?: readonly { path: string, zone: PathZone }[]
@@ -108,7 +106,6 @@ export function ask(input: {
   summary: string
 }): PermissionDecision {
   return {
-    allowForTurn: input.allowForTurn ?? true,
     ...(input.grant ? { grant: input.grant } : {}),
     kind: input.kind,
     ...(input.paths?.length ? { paths: input.paths } : {}),

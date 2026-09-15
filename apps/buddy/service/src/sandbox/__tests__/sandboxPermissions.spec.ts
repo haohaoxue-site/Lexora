@@ -69,7 +69,6 @@ describe('isolated shell permissions', () => {
   it('does not let isolation bypass an explicitly forced confirmation', async () => {
     await expect(engine.decide({ ...request, shellBoundary: 'sandbox', forceAsk: true })).resolves.toMatchObject({
       type: 'ask',
-      allowForTurn: false,
       shell: { reason: 'forced-confirmation' },
     })
   })
@@ -82,16 +81,16 @@ describe('isolated shell permissions', () => {
       sandboxDirectory: { path: '/reference', access: 'read', reason: 'Inspect reference' },
       toolName: 'lexora_authorize_directory',
     })
-    expect(review).toEqual({ card: 'sandbox-directory', toolName: 'lexora_authorize_directory', path: '/reference', access: 'read', reason: 'Inspect reference', allowForTurn: false, scope: 'run' })
+    expect(review).toEqual({ card: 'sandbox-directory', toolName: 'lexora_authorize_directory', path: '/reference', access: 'read', reason: 'Inspect reference', allowForTurn: true, scope: 'run' })
     expect(approvalReviewPayloadMatchesKind(review, 'read')).toBe(true)
     expect(approvalReviewPayloadMatchesKind(review, 'write')).toBe(false)
     expect(approvalReviewPayloadSchema.safeParse({ ...review, scope: 'permanent' }).success).toBe(false)
-    expect(approvalReviewPayloadSchema.safeParse({ ...review, allowForTurn: true }).success).toBe(false)
+    expect(approvalReviewPayloadSchema.safeParse({ ...review, allowForTurn: false }).success).toBe(true)
     expect(approvalReviewPayloadSchema.safeParse({ ...review, device: 1, inode: 2 }).success).toBe(false)
   })
 
-  it('never reuses turn authorization for host escape and forbids it in read-only/background runs', async () => {
-    await expect(engine.decide({ ...request, toolName: 'lexora_host_shell' })).resolves.toMatchObject({ type: 'ask', allowForTurn: false, shell: { reason: 'sandbox-bypass' } })
+  it('requires host authorization and forbids host escape in read-only/background runs', async () => {
+    await expect(engine.decide({ ...request, toolName: 'lexora_host_shell' })).resolves.toMatchObject({ type: 'ask', shell: { reason: 'sandbox-bypass' } })
     await expect(engine.decide({ ...request, toolName: 'lexora_host_shell', profile: 'read_only' })).resolves.toMatchObject({ type: 'deny', code: 'READ_ONLY_PROFILE' })
     await expect(engine.decide({ ...request, toolName: 'lexora_host_shell', approvalAvailable: false })).resolves.toMatchObject({ type: 'deny', code: 'APPROVAL_UNAVAILABLE_IN_BACKGROUND' })
   })

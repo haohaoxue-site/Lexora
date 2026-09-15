@@ -18,7 +18,7 @@ describe('turn approval scope', () => {
     })
     const controller = new AbortController()
     const initial = service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'npm view package version' },
       kind: 'network',
       runId: 'run-1',
@@ -39,7 +39,7 @@ describe('turn approval scope', () => {
     })
 
     await expect(service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'python process.py' },
       kind: 'shell',
       runId: 'run-1',
@@ -54,7 +54,7 @@ describe('turn approval scope', () => {
     expect(repository.list({ runId: 'run-1' })).toHaveLength(1)
 
     const nextTurn = service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'python process.py' },
       kind: 'shell',
       runId: 'run-2',
@@ -73,7 +73,7 @@ describe('turn approval scope', () => {
 
     service.clearRunAuthorizations('run-1')
     const clearedTurn = service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'python process.py' },
       kind: 'shell',
       runId: 'run-1',
@@ -161,7 +161,7 @@ describe('turn approval scope', () => {
     })
     const signal = new AbortController().signal
     const initial = service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { query: 'first' },
       kind: 'mcp',
       reuse: { operation: ['calendar', 3, 'search'], source: ['calendar', 3] },
@@ -176,7 +176,7 @@ describe('turn approval scope', () => {
     await service.resolve({ decision: 'approved_for_operation', id: approved.id })
     await initial
     await expect(service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { query: 'second' },
       kind: 'mcp',
       reuse: { operation: ['calendar', 3, 'search'], source: ['calendar', 3] },
@@ -188,7 +188,7 @@ describe('turn approval scope', () => {
     })).resolves.toMatchObject({ decision: 'approved_by_operation' })
 
     const changed = service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { query: 'third' },
       kind: 'mcp',
       reuse: { operation: ['calendar', 4, 'search'], source: ['calendar', 4] },
@@ -212,7 +212,7 @@ describe('turn approval scope', () => {
       repository,
     })
     const request = service.request({
-      allowForTurn: false,
+      reuseScopes: [],
       arguments: { command: 'systemctl restart fixture' },
       kind: 'shell',
       runId: 'run-single-use',

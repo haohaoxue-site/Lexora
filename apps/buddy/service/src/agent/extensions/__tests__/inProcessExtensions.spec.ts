@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { ModelRuntime } from '@earendil-works/pi-coding-agent'
 import { Type } from 'typebox'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ToolAuthorizationService } from '../../../permissions/ToolAuthorizationService'
 
 import {
   SystemActionPreparationRegistry,
@@ -183,18 +184,20 @@ describe('buddy in-process Pi extensions', () => {
       inProcessExtensions: [
         createSystemExtension({ service: systemCapability }),
         createToolPolicyExtension({
-          approvalAvailable: true,
-          owner: { id: 'conversation-1', kind: 'conversation' as const },
-          approvalService: { request: approvalRequest },
+          authorization: new ToolAuthorizationService({
+            approvalAvailable: true,
+            owner: { id: 'conversation-1', kind: 'conversation' as const },
+            approvalService: { request: approvalRequest },
+            cwd: root,
+            approvalPolicy: 'policy' as const,
+            executionProfile: 'workspace_write',
+            getGrants: () => [{ canonicalRoot: root, grantId: 'workspace-1', kind: 'workspace' as const, root }],
+          }),
           classifyTool: (event, run) => classifySystemTool(
             systemCapability,
             event,
             run.signal,
           ) ?? {},
-          cwd: root,
-          approvalPolicy: 'policy' as const,
-          executionProfile: 'workspace_write',
-          getGrants: () => [{ canonicalRoot: root, grantId: 'workspace-1', kind: 'workspace' as const, root }],
           getRunContext: () => ({
             ...toolLifecycle(),
             runId: 'run-1',
@@ -335,18 +338,20 @@ describe('buddy in-process Pi extensions', () => {
       inProcessExtensions: [
         createSystemExtension({ service: systemCapability }),
         createToolPolicyExtension({
-          approvalAvailable: true,
-          owner: { id: 'conversation-1', kind: 'conversation' as const },
-          approvalService: { request: approvalRequest },
+          authorization: new ToolAuthorizationService({
+            approvalAvailable: true,
+            owner: { id: 'conversation-1', kind: 'conversation' as const },
+            approvalService: { request: approvalRequest },
+            cwd: root,
+            approvalPolicy: 'policy' as const,
+            executionProfile: 'workspace_write',
+            getGrants: () => [{ canonicalRoot: root, grantId: 'workspace-1', kind: 'workspace' as const, root }],
+          }),
           classifyTool: (event, run) => classifySystemTool(
             systemCapability,
             event,
             run.signal,
           ) ?? {},
-          cwd: root,
-          approvalPolicy: 'policy' as const,
-          executionProfile: 'workspace_write',
-          getGrants: () => [{ canonicalRoot: root, grantId: 'workspace-1', kind: 'workspace' as const, root }],
           getRunContext: () => ({
             ...toolLifecycle(),
             runId: 'run-1',

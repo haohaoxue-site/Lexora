@@ -78,7 +78,7 @@ describe('approvalService', () => {
     })
 
     const decision = service.request({
-      allowForTurn: false,
+      reuseScopes: [],
       arguments: { operation: 'upsert' },
       automation: {
         executionProfile: 'workspace_write',
@@ -145,7 +145,7 @@ describe('approvalService', () => {
     })
 
     const decision = service.request({
-      allowForTurn: false,
+      reuseScopes: [],
       arguments: { action: { kind: 'click', ref: 'e1' } },
       browser: BROWSER_REVIEW,
       kind: 'browser',
@@ -207,7 +207,7 @@ describe('approvalService', () => {
     })
 
     await expect(service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'pnpm test' },
       kind: 'shell',
       runId: 'run-request-failure',
@@ -252,7 +252,7 @@ describe('approvalService', () => {
     const controller = new AbortController()
 
     const initialDecision = service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'npm view package version' },
       kind: 'network',
       runId: 'run-turn-approval',
@@ -274,7 +274,7 @@ describe('approvalService', () => {
     })
 
     await expect(service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'python process.py' },
       kind: 'shell',
       runId: 'run-turn-approval',
@@ -316,7 +316,7 @@ describe('approvalService', () => {
     expect(repository.list({ runId: 'run-turn-approval' })).toHaveLength(1)
 
     const explicitDecision = service.request({
-      allowForTurn: false,
+      reuseScopes: [],
       arguments: { operation: 'upsert' },
       automation: {
         executionProfile: 'workspace_write',
@@ -395,7 +395,7 @@ describe('approvalService', () => {
     vi.useFakeTimers()
 
     const decision = service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'pnpm test' },
       kind: 'shell',
       runId: 'run-abort',
@@ -455,7 +455,7 @@ describe('approvalService', () => {
     })
     const service = new ApprovalService({ eventLog: { append }, repository })
     const decision = service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'pnpm test' },
       kind: 'shell',
       runId: 'run-1',
@@ -523,7 +523,7 @@ describe('approvalService', () => {
     const service = new ApprovalService({ eventLog: { append }, repository })
     const controller = new AbortController()
     const decision = service.request({
-      allowForTurn: true,
+      reuseScopes: ['operation', 'source', 'turn'],
       arguments: { command: 'pnpm test' },
       kind: 'shell',
       runId: 'run-1',
