@@ -131,6 +131,28 @@ export class DesktopDiagnosticLogger {
     return this.status
   }
 
+  async flushWithin(timeoutMs = this.#closeTimeoutMs): Promise<DesktopDiagnosticStatus> {
+    const target = this.#status.accepted
+    if (this.#settled >= target)
+      return this.status
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let waiter: { target: number, resolve: () => void } | undefined
+    try {
+      await new Promise<void>((resolve) => {
+        waiter = { target, resolve }
+        this.#flushWaiters.push(waiter)
+        timer = setTimeout(resolve, timeoutMs)
+      })
+    }
+    finally {
+      clearTimeout(timer)
+      const index = waiter ? this.#flushWaiters.indexOf(waiter) : -1
+      if (index >= 0)
+        this.#flushWaiters.splice(index, 1)
+    }
+    return this.status
+  }
+
   close(): Promise<DesktopDiagnosticStatus> {
     this.#closing ??= this.#close()
     return this.#closing

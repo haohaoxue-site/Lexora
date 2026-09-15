@@ -35,6 +35,19 @@ async function readRecords(directory: string, file = 'application.jsonl'): Promi
 afterEach(() => vi.restoreAllMocks())
 
 describe('desktop diagnostics', () => {
+  it('bounds recovery flush without closing the logger or losing later recovery actions', async () => {
+    const { logger } = await createLogger()
+    const blocked = deferred<void>()
+    vi.spyOn(DiagnosticFile.prototype, 'append').mockImplementation(async () => blocked.promise)
+    logger.record(event)
+    const status = await logger.flushWithin(10)
+    expect(status).toMatchObject({ state: 'open', accepted: 1, written: 0 })
+    expect(status.pendingBytes).toBeGreaterThan(0)
+    expect(logger.record({ ...event, event: 'startup.recovery.action_requested', recoveryAction: 'quit' })).toBe(true)
+    blocked.resolve()
+    expect(await logger.flush()).toMatchObject({ state: 'open', written: 2, pendingBytes: 0 })
+  })
+
   it('carries safe native failure details through lifecycle recording and log queries', async () => {
     const { directory, logger } = await createLogger()
     const events = new ApplicationEvents()

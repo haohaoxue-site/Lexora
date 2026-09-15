@@ -48,6 +48,63 @@ pub struct SystemError {
     code: u32,
 }
 
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DirectoryAclReason {
+    OwnerMissing,
+    OwnerUntrusted,
+    DaclMissing,
+    NullDacl,
+    AclInvalid,
+    AceInvalid,
+    UntrustedAccess,
+    UnsupportedAce,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DirectoryPrincipal {
+    CurrentUser,
+    System,
+    Administrators,
+    CreatorOwner,
+    Everyone,
+    BuiltinUsers,
+    AuthenticatedUsers,
+    AllAppPackages,
+    Other,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirectoryAclFailure {
+    reason: DirectoryAclReason,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ace_index: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ace_type: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ace_flags: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    access_mask: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    principal: Option<DirectoryPrincipal>,
+}
+
+#[cfg(windows)]
+impl DirectoryAclFailure {
+    fn new(reason: DirectoryAclReason) -> Self {
+        Self {
+            reason,
+            ace_index: None,
+            ace_type: None,
+            ace_flags: None,
+            access_mask: None,
+            principal: None,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, thiserror::Error)]
 #[error("{code}")]
 #[serde(rename_all = "camelCase")]
@@ -58,6 +115,8 @@ pub struct DirectoryFailure {
     directory_index: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     system_error: Option<SystemError>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    acl: Option<DirectoryAclFailure>,
 }
 
 impl DirectoryFailure {
@@ -67,6 +126,15 @@ impl DirectoryFailure {
             operation,
             directory_index: None,
             system_error: None,
+            acl: None,
+        }
+    }
+
+    #[cfg(windows)]
+    fn acl(details: DirectoryAclFailure) -> Self {
+        Self {
+            acl: Some(details),
+            ..Self::new(DirectoryError::Unsafe, DirectoryOperation::ValidateAcl)
         }
     }
 

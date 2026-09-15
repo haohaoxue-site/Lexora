@@ -77,7 +77,7 @@ describe('buddyServiceSupervisor utility process lifecycle', () => {
   it('keeps slow initialization and queued requests alive within the cold-start budget', async () => {
     vi.useFakeTimers()
     try {
-      const { processes, supervisor } = createSupervisor([], {})
+      const { processes, supervisor, diagnostics } = createSupervisor([], {})
       supervisor.start()
       const pending = supervisor.request('runtime.status', {})
       await vi.advanceTimersByTimeAsync(35_000)
@@ -92,6 +92,7 @@ describe('buddyServiceSupervisor utility process lifecycle', () => {
       await vi.advanceTimersByTimeAsync(0)
       processes[0]!.exit()
       await stopping
+      expect(diagnostics).toContainEqual(expect.objectContaining({ event: 'runtime.exited', processExit: { type: 'utility', reason: 'clean-exit', code: 0, expected: true } }))
     }
     finally {
       vi.useRealTimers()

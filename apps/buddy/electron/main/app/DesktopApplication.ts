@@ -7,11 +7,13 @@ import { ServiceHost } from '../../../shared/lifecycle/ServiceHost'
 import { resolveDesktopLaunchIntent } from '../startupIntent'
 import { confirmDesktopQuit, showBackgroundCloseNotice, showDesktopStartupFailure, showLegacyPowerShellNotice } from './desktopDialogs'
 import { DesktopIntegrations } from './DesktopIntegrations'
+import { describeProcessExit } from './desktopProcessDiagnostics'
 import { createDesktopQuitLifecycle } from './desktopQuitLifecycle'
+import { readPreviousLaunchId } from './desktopRecovery'
 import { DesktopRuntimeHost } from './DesktopRuntimeHost'
 import { checkDesktopSmokeBridge } from './desktopSmokeCheck'
 import { DesktopWindowHost } from './DesktopWindowHost'
-import { prepareDesktopEnvironment, prepareDesktopReady } from './environment'
+import { initializeDesktopEnvironment, prepareDesktopEnvironment, prepareDesktopReady } from './environment'
 
 class DesktopApplication {
   readonly #environment: DesktopEnvironment
@@ -33,13 +35,25 @@ class DesktopApplication {
         getWindow: () => this.#windows.window,
         getLanguage: () => this.#runtime.language,
       }, options),
-      dispose: () => this.#dispose(),
+      dispose: async () => {
+        try {
+          await this.#dispose()
+        }
+        finally { await environment.diagnostics.close() }
+      },
       quit: () => app.quit(),
     })
     this.#integrations = new DesktopIntegrations(environment, this.#runtime, this.#windows, () => this.#requestQuit())
   }
 
   bindEvents(): void {
+    app.on('child-process-gone', (_event, details) => {
+      this.#environment.events.publish({
+        level: details.reason === 'clean-exit' ? 'info' : 'error',
+        event: 'process.exited',
+        processExit: describeProcessExit(details.type === 'GPU' ? 'gpu' : details.type === 'Utility' ? 'utility' : 'other', details),
+      })
+    })
     nativeTheme.on('updated', () => this.#windows.updateAppearance())
     process.once('SIGINT', () => {
       void this.#quit.request({ discardDraftsOnFailure: true }).catch(async (error) => {
@@ -111,7 +125,10 @@ class DesktopApplication {
           await showDesktopStartupFailure(error, this.#runtime.language, this.#environment)
       }
       finally {
-        app.exit(1)
+        try {
+          await this.#environment.diagnostics.close()
+        }
+        finally { app.exit(1) }
       }
     }
   }
@@ -137,7 +154,6 @@ class DesktopApplication {
       }
       this.#environment.events.publish({ level: failures.length ? 'error' : 'info', event: failures.length ? 'app.stop_failed' : 'app.stopped' })
       this.#environment.startup.stopped()
-      await this.#environment.diagnostics.close()
       if (failures.length)
         throw new AggregateError(failures, 'Desktop application cleanup failed')
     })()
@@ -147,18 +163,28 @@ class DesktopApplication {
 
 export function startDesktopApplication(): void {
   let environment: DesktopEnvironment | undefined
+  let recoveryRecorded = false
   try {
     environment = prepareDesktopEnvironment()
+    initializeDesktopEnvironment(environment)
     if (!app.requestSingleInstanceLock()) {
-      app.quit()
+      void environment.diagnostics.close().finally(() => app.quit())
       return
     }
     environment.events.publish({ level: 'info', event: 'app.starting' })
+    const previousLaunchId = readPreviousLaunchId(process.argv)
+    if (previousLaunchId) {
+      environment.events.publish({ level: 'info', event: 'app.recovery_started', previousLaunchId })
+      recoveryRecorded = true
+    }
     const application = new DesktopApplication(environment)
     application.bindEvents()
     void application.start().catch(error => application.handleStartupFailure(error))
   }
   catch (error) {
+    const previousLaunchId = readPreviousLaunchId(process.argv)
+    if (previousLaunchId && !recoveryRecorded)
+      environment?.events.publish({ level: 'info', event: 'app.recovery_started', previousLaunchId })
     environment?.startup.failed(error)
     void showDesktopStartupFailure(error, 'zh-CN', environment).finally(async () => {
       try {

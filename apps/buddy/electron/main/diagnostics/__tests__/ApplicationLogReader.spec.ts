@@ -21,6 +21,25 @@ async function fixture() {
 }
 
 describe('application log queries', () => {
+  it('retains structured startup failures and cross-launch recovery correlation through rotation', async () => {
+    const { directory } = await fixture()
+    const first = new DesktopDiagnosticLogger({ directory, appVersion: '0.6.0', userHome: '/fixture' })
+    const aclFailure = { kind: 'private_directories', operation: 'validate_acl', directoryRole: 'user_data', acl: { reason: 'untrusted_access', aceIndex: 3, aceFlags: 19, accessMask: 129, principal: 'builtin_users' } } as const
+    first.record({ scope: 'desktop', event: 'app.start_failed', level: 'error', failure: aclFailure })
+    await first.close()
+    const current = new DesktopDiagnosticLogger({ directory, appVersion: '0.6.0', userHome: '/fixture' })
+    const bootstrapFailure = { kind: 'desktop_bootstrap', operation: 'create_directory', directoryRole: 'user_data', systemCode: 'EEXIST' } as const
+    current.record({ scope: 'desktop', event: 'app.recovery_started', level: 'info', previousLaunchId: first.launchId })
+    current.record({ scope: 'desktop', event: 'app.start_failed', level: 'error', failure: bootstrapFailure })
+    await current.close()
+    const records = (await new ApplicationLogReader(directory, current.launchId, '/fixture').query({ launch: 'all' })).records
+    expect(records).toMatchObject([
+      { failure: bootstrapFailure },
+      { previousLaunchId: first.launchId, launchId: current.launchId },
+      { failure: aclFailure, launchId: first.launchId },
+    ])
+  })
+
   it('reads the actual recorder format, discovers launches and defaults to the current launch', async () => {
     const { directory } = await fixture()
     const first = new DesktopDiagnosticLogger({ directory, appVersion: '0.2.0', userHome: '/home/fixture' })

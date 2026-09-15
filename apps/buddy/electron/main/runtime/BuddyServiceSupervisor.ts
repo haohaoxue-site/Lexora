@@ -50,6 +50,7 @@ interface ServiceGeneration extends BuddyServiceProcessHandle {
   disposeBinding: () => void
   id: number
   ready: boolean
+  terminationRequested: boolean
 }
 
 const DEFAULT_RESTART_DELAYS_MS = [500, 1_000, 2_000, 5_000, 10_000]
@@ -207,6 +208,7 @@ export class BuddyServiceSupervisor {
     if (!generation)
       return true
     this.#record({ event: 'runtime.shutdown.started', level: 'info' }, generation)
+    generation.terminationRequested = true
     this.#generation = null
     this.#generationId += 1
     this.#clearReadinessTimer()
@@ -259,6 +261,7 @@ export class BuddyServiceSupervisor {
       disposeBinding: this.#bindPeer?.(handle.peer) ?? (() => {}),
       id,
       ready: false,
+      terminationRequested: false,
     }
     this.#generation = generation
     this.#record({ event: 'runtime.spawned', level: 'info', attempt: this.#state.restartAttempt }, generation)
@@ -322,7 +325,11 @@ export class BuddyServiceSupervisor {
         listener({ method, params })
     })
     generation.process.once('exit', (code) => {
-      this.#record({ event: code === 0 ? 'runtime.exited' : 'runtime.exited_abnormally', level: code === 0 ? 'info' : 'error' }, generation)
+      this.#record({
+        event: code === 0 ? 'runtime.exited' : 'runtime.exited_abnormally',
+        level: code === 0 ? 'info' : 'error',
+        processExit: { type: 'utility', reason: code === 0 ? 'clean-exit' : 'abnormal-exit', code, expected: generation.terminationRequested },
+      }, generation)
       this.#exitCodes.set(generation.process, code)
       this.#exitedProcesses.add(generation.process)
       this.#handleExit(id, code)
@@ -392,6 +399,7 @@ export class BuddyServiceSupervisor {
         generation.process,
         this.#exitedProcesses.has(generation.process),
       )
+      generation.terminationRequested = true
       generation.process.kill()
       const terminated = await settleWithin(exited, this.#forceKillTimeoutMs)
       if (intent !== this.#intent || !this.#desiredRunning)

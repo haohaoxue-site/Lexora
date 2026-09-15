@@ -14,6 +14,7 @@ import { DesktopWindowManager } from '../DesktopWindowManager'
 import { DesktopWindowStateStore, resolveVisibleWindowPlacement } from '../desktopWindowState'
 import { resolveDevelopmentRendererUrl } from '../security/navigationPolicy'
 import { applyDesktopWindowAppearance, createDesktopWindow } from '../window'
+import { observeRendererDiagnostics } from './desktopProcessDiagnostics'
 
 interface WindowBindings {
   executeCommand: ExecuteDesktopCommand
@@ -102,9 +103,7 @@ export class DesktopWindowHost {
         handle.window.on('unresponsive', () => {
           environment.events.publish({ level: 'warn', event: 'window.unresponsive' })
         })
-        handle.window.webContents.on('render-process-gone', () => {
-          environment.events.publish({ level: 'error', event: 'renderer.exited_abnormally' })
-        })
+        observeRendererDiagnostics(handle.window.webContents, event => environment.events.publish(event))
         this.#browser?.dispose()
         this.#browser = new BrowserHost({
           onGuestSetChanged() {

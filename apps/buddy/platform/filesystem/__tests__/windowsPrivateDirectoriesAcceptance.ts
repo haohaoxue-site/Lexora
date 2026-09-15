@@ -80,7 +80,7 @@ try {
   await assert.rejects(ensurePrivateDirectories([insecure], helper), (error: unknown) => {
     assert.ok(error instanceof PrivateDirectoryError)
     assert.equal(error.code, 'PRIVATE_DIRECTORIES_UNSAFE')
-    assert.deepEqual(error.failure, { kind: 'private_directories', operation: 'validate_acl', directoryIndex: 0, exitCode: 1 })
+    assert.deepEqual(error.failure, { kind: 'private_directories', operation: 'validate_acl', directoryIndex: 0, exitCode: 1, acl: { reason: 'untrusted_access', aceIndex: broad.allows.indexOf('S-1-1-0'), aceType: 0, aceFlags: 3, accessMask: 0x120089, principal: 'everyone' } })
     return true
   })
   assert.equal(inspect(insecure).sddl, broad.sddl)
