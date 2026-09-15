@@ -5,7 +5,7 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 
 const props = defineProps<{
-  attachment: LocalAttachment
+  attachment: Pick<LocalAttachment, 'name'>
   imageLabel?: string
   language: BuddyLocale
   resourceId: string
@@ -21,7 +21,7 @@ const { t } = useBuddyI18n(() => props.language)
 <template>
   <a
     class="buddy-chat-resource-reference"
-    :href="`#buddy-attachment-${attachment.attachmentId}`"
+    :href="`#buddy-resource-${resourceId}`"
     :aria-label="t('desktop.chat.locateAttachment', { name: imageLabel ?? attachment.name })"
     :data-resource-id="resourceId"
     @click.prevent="emit('locate', resourceId)"

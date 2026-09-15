@@ -6,7 +6,7 @@ import { Dismiss16Regular } from '@vicons/fluent'
 import { NButton, NScrollbar, NSpin } from 'naive-ui'
 import { computed, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import { FileIcon } from '@/shared/ui/file-icon'
+import { FileIcon, FolderIcon } from '@/shared/ui/file-icon'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
 import { useResourceHighlight } from '../attachments/useResourceHighlight'
@@ -59,6 +59,7 @@ defineExpose({ highlightResource })
           class="composer-resource-strip__card"
           :class="{ 'is-failed': resource.state === 'failed', 'is-highlighted': highlightedResourceId === resource.resourceId, 'is-previewable': previewUrl }"
           :data-resource-card="resource.resourceId"
+          :title="resource.localReference?.path"
           @click="previewUrl && openPreview(previewUrl)"
         >
           <NSpin v-if="resource.state === 'importing'" :size="20" />
@@ -71,6 +72,7 @@ defineExpose({ highlightResource })
           >
             <img :src="previewUrl" :alt="resource.name" width="36" height="36" @error="markPreviewFailed(previewUrl)">
           </button>
+          <FolderIcon v-else-if="resource.kind === 'directory'" class="composer-resource-strip__folder" />
           <FileIcon v-else :name="resource.name" size="medium" />
           <span class="composer-resource-strip__details">
             <span>{{ imageLabel ?? resource.name }}</span>
@@ -119,6 +121,7 @@ defineExpose({ highlightResource })
 }
 
 .composer-resource-strip {
+  &__folder { width: 2rem; height: 2rem; }
   display: flex;
   flex-wrap: nowrap;
   gap: 0.45rem;

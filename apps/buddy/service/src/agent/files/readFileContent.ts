@@ -8,8 +8,14 @@ export function detectBinaryReadFormat(buffer: Buffer): string | undefined {
     return 'WAV audio'
   if (/^RIFF[\s\S]{4}AVI /.test(header))
     return 'AVI video'
-  if (/^[\s\S]{4}ftyp[\x20-\x7E]{4}/.test(header))
-    return 'MP4/M4A container'
+  if (/^[\s\S]{4}ftyp[\x20-\x7E]{4}/.test(header)) {
+    const brand = header.slice(8, 12)
+    if (['avif', 'avis'].includes(brand))
+      return 'AVIF image'
+    if (['heic', 'heix', 'hevc', 'hevx', 'mif1', 'msf1'].includes(brand))
+      return 'HEIF image/container'
+    return ['isom', 'iso2', 'mp41', 'mp42', 'M4A ', 'M4V '].includes(brand) ? 'MP4/M4A container' : 'ISO base media container'
+  }
   if (header.startsWith('\x1A\x45\xDF\xA3'))
     return 'WebM/Matroska container'
   if (hasId3Header(header))

@@ -1,7 +1,7 @@
 import type { ToolResultMessage } from '@earendil-works/pi-ai'
 import type { ExtensionContext, ReadToolInput, ReadToolOptions } from '@earendil-works/pi-coding-agent'
 import { Buffer } from 'node:buffer'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, truncate, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { convertToLlm, serializeConversation } from '@earendil-works/pi-coding-agent'
@@ -28,6 +28,8 @@ const formats: [string, Buffer][] = [
   ['WAV audio', Buffer.concat([Buffer.from('RIFF'), Buffer.from([0xB6, 0x50, 0x0D, 0]), Buffer.from('WAVEfmt '), Buffer.alloc(50_000)])],
   ['AVI video', Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('AVI '), Buffer.alloc(32)])],
   ['MP4/M4A container', Buffer.concat([Buffer.from([0, 0, 0, 20]), Buffer.from('ftypM4A '), Buffer.alloc(8)])],
+  ['AVIF image', Buffer.concat([Buffer.from([0, 0, 0, 20]), Buffer.from('ftypavif'), Buffer.alloc(8)])],
+  ['HEIF image/container', Buffer.concat([Buffer.from([0, 0, 0, 20]), Buffer.from('ftypheic'), Buffer.alloc(8)])],
   ['WebM/Matroska container', Buffer.from([0x1A, 0x45, 0xDF, 0xA3, 0, 0, 0, 0])],
   ['ID3-tagged audio', Buffer.from('ID3\x04\0\0\0\0\0\0fixture')],
   ['MPEG audio', Buffer.from([0xFF, 0xFB, 0x90, 0x64])],
@@ -39,6 +41,15 @@ const formats: [string, Buffer][] = [
 ]
 
 describe('buddy read adapter contract', () => {
+  it('inspects a sparse large file without loading its body and rejects directories', async () => {
+    const path = join(root, 'large.bin')
+    await writeFile(path, 'header')
+    await truncate(path, 1024 * 1024 * 1024)
+    const result = await createReadTool(root).execute('large', { path })
+    expect(result.details?.contentOmitted).toEqual({ format: 'File exceeding the 32 MiB read memory limit', sizeBytes: 1024 * 1024 * 1024 })
+    expect(JSON.stringify(result).length).toBeLessThan(1000)
+    await expect(createReadTool(root).execute('directory', { path: root })).rejects.toThrow('regular file')
+  })
   it.each(formats)('returns metadata and a next action for %s regardless of extension', async (format, bytes) => {
     await writeFile(join(root, 'renamed.txt'), bytes)
     const result = await createReadTool(root).execute('read', { path: 'renamed.txt', offset: 999 })

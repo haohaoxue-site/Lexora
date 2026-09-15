@@ -41,7 +41,7 @@ export function registerSpaceRpc(options: RegisterSpaceRpcOptions): () => void {
     return options.service.list().slice(0, input.limit ?? 100)
   }))
   disposers.push(registerRuntimeRequest(options.rpc, spacesRpc.searchFiles, (input) => {
-    return options.service.searchFiles(input.spaceId, input.query)
+    return options.service.searchFiles(input.spaceId, input.query, input.deepSearch ?? false)
   }))
 
   return () => disposers.splice(0).forEach(dispose => dispose())

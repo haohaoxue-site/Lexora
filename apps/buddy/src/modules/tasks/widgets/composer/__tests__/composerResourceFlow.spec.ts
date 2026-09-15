@@ -56,6 +56,8 @@ async function mountFlow() {
     async selectSource(input, referencedResourceIds = []) {
       if (referencedResourceIds.length >= BUDDY_ATTACHMENT_COUNT_LIMIT)
         throw new Error('Attachment limit exceeded')
+      if ('localPath' in input.source || 'resourceId' in input.source)
+        throw new Error('This fixture only supports legacy source selections')
       const source = 'bindingId' in input.source
         ? { ...input.source, bindingRevision: 1 }
         : 'messageId' in input.source

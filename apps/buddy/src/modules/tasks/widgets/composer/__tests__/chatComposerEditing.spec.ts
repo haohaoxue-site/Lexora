@@ -3,12 +3,14 @@ import type { BuddyComposerSource } from '@buddy-shared/conversation/composerRes
 import type { BuddyServiceTier, BuddyThinkingLevel } from '@buddy-shared/conversation/modelSelection'
 import type { LocalRuntimeModelOption } from '@buddy-shared/providers/providerApi'
 import type { JSONContent } from '@tiptap/core'
+import type { ComposerResourceView } from '../../../state/composer/typing'
 import type { ChatComposerContextOptions, ChatPromptContextOption } from '@/modules/prompt-input'
 import { deferred } from '@buddy-tests/deferred'
 import { EditorContent } from '@tiptap/vue-3'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createApp, defineComponent, h, nextTick, shallowRef } from 'vue'
 import { createChatComposerContentFromText, getChatComposerResourceIds } from '@/modules/prompt-input'
+import { insertChatComposerResources } from '@/modules/prompt-input/ui'
 import { useChatComposer } from '../useChatComposer'
 
 const cleanups: (() => void)[] = []
@@ -26,13 +28,14 @@ function fileOption(name: string): ChatPromptContextOption {
 }
 
 async function mountComposer(options: {
-  loadContextOptions?: (query: string | null) => Promise<ChatComposerContextOptions>
+  loadContextOptions?: (query: string | null, deepSearch?: boolean) => Promise<ChatComposerContextOptions>
   selectSource?: (source: BuddyComposerSource) => Promise<string | null>
   model?: LocalRuntimeModelOption
 } = {}) {
   const content = shallowRef(createChatComposerContentFromText(''))
   const draft = shallowRef('')
   const draftId = shallowRef('draft-1')
+  const resources = shallowRef<readonly ComposerResourceView[]>([])
   const selectedEffort = shallowRef<BuddyThinkingLevel | null>(null)
   const selectedServiceTier = shallowRef<BuddyServiceTier | null>(null)
   const updates: { text: string, content: JSONContent }[] = []
@@ -47,7 +50,7 @@ async function mountComposer(options: {
         composerContent: content,
         draft,
         draftId,
-        resources: shallowRef([]),
+        resources,
         rejectedResourceIds: () => new Set(),
         isRunning: shallowRef(false),
         isSending: shallowRef(false),
@@ -86,10 +89,155 @@ async function mountComposer(options: {
     editor.view.dom.dispatchEvent(event)
     return event
   }
-  return { composer, content, draft, draftId, editor, keydown, selectedEffort, selectedServiceTier, sent, updates, unmount }
+  return { composer, content, draft, draftId, editor, keydown, resources, selectedEffort, selectedServiceTier, sent, updates, unmount }
 }
 
 describe('chat composer editing', () => {
+  it('uses working-directory-relative navigation, keeps external paths absolute and resets deep search between mentions', async () => {
+    const queries: Array<{ query: string | null, deep: boolean | undefined }> = []
+    const folder = { ...fileOption('apps'), path: '/work/apps', entryKind: 'directory' as const }
+    const flow = await mountComposer({ loadContextOptions: async (query, deep) => {
+      queries.push({ query, deep })
+      return { files: [folder], skills: [], directory: { workingDirectory: '/work', path: query?.startsWith('apps/') ? '/work/apps' : '/work', status: 'ready', hasMore: false } }
+    } })
+    flow.editor.view.dom.focus()
+    flow.editor.commands.insertContent('@ap')
+    await nextTick()
+    flow.composer.setDeepSearch(true)
+    await nextTick()
+    expect(queries.at(-1)).toEqual({ query: 'ap', deep: true })
+    flow.keydown('Tab')
+    await nextTick()
+    expect(flow.editor.getText()).toBe('@apps/')
+    expect(flow.composer.deepSearch.value).toBe(true)
+    expect(getChatComposerResourceIds(flow.editor.getJSON())).toEqual([])
+    flow.keydown('Tab', { shiftKey: true })
+    await nextTick()
+    expect(flow.editor.getText()).toBe('@')
+    flow.composer.navigateDirectory('/downloads/media folder')
+    await nextTick()
+    expect(flow.editor.getText()).toBe('@"/downloads/media folder/')
+    flow.keydown('Escape')
+    expect(flow.composer.deepSearch.value).toBe(false)
+    flow.editor.commands.insertContent('" @')
+    await nextTick()
+    expect(queries.at(-1)).toEqual({ query: '', deep: false })
+    expect(flow.sent).toEqual([])
+  })
+
+  it('does not accept a late deep-search response after switching back to direct browsing', async () => {
+    const deep = deferred<ChatComposerContextOptions>()
+    const flow = await mountComposer({ loadContextOptions: (_query, recursive) => recursive ? deep.promise : Promise.resolve({ files: [fileOption('direct')], skills: [] }) })
+    flow.editor.view.dom.focus()
+    flow.editor.commands.insertContent('@')
+    await nextTick()
+    flow.composer.setDeepSearch(true)
+    flow.composer.setDeepSearch(false)
+    await nextTick()
+    deep.resolve({ files: [fileOption('nested')], skills: [] })
+    await nextTick()
+    expect(flow.composer.suggestions.value.map(item => item.option.label)).toEqual(['direct'])
+  })
+
+  it('shares clipboard image labels across @ candidates, repeated references and removal', async () => {
+    const flow = await mountComposer()
+    const resource = { draftId: 'draft-1', kind: 'image' as const, mimeType: 'image/png', name: 'image.png', nameSource: 'clipboard' as const, previewUrl: null, sizeBytes: 10, state: 'ready' as const }
+    flow.resources.value = ['second', 'first'].map(resourceId => ({ accepted: true, canRetry: false, resource: { ...resource, attachmentId: resourceId, resourceId } }))
+    insertChatComposerResources(flow.editor, ['first', 'second'], 'both')
+    flow.editor.view.dom.focus()
+    flow.editor.commands.insertContent('@')
+    const candidates = () => flow.composer.suggestions.value.map(({ option }) => [option.value, option.label])
+    const inlineLabels = () => [...flow.editor.view.dom.querySelectorAll('[data-type="chat-resource-reference"]')].map(element => element.textContent)
+    await expect.poll(candidates).toEqual([['first', '[Image #1]'], ['second', '[Image #2]']])
+    expect(inlineLabels()).toEqual(['[Image #1]', '[Image #2]'])
+    flow.keydown('ArrowDown')
+    flow.keydown('Enter')
+    await expect.poll(inlineLabels).toEqual(['[Image #1]', '[Image #2]', '[Image #2]'])
+    expect(getChatComposerResourceIds(flow.editor.getJSON())).toEqual(['first', 'second'])
+
+    flow.editor.commands.insertContent('@image.png')
+    await expect.poll(candidates).toEqual([['first', '[Image #1]'], ['second', '[Image #2]']])
+    flow.keydown('Escape')
+    flow.composer.removeResource('first')
+    await expect.poll(inlineLabels).toEqual(['[Image #1]', '[Image #1]'])
+    flow.editor.commands.insertContent(' @#1')
+    await expect.poll(candidates).toEqual([['second', '[Image #1]']])
+    expect(flow.composer.resourceStripResources.value.map(entry => entry.imageLabel)).toEqual(['[Image #1]'])
+    expect(flow.sent).toEqual([])
+  })
+
+  it('reuses a current input through @ without reimporting, and excludes removed or other-draft resources', async () => {
+    const flow = await mountComposer({ selectSource: async () => {
+      throw new Error('Current inputs must reuse their existing resource')
+    } })
+    const resource = { attachmentId: 'image-copy', draftId: 'draft-1', kind: 'image' as const, mimeType: 'image/png', name: 'current.png', previewUrl: null, resourceId: 'current', sizeBytes: 10, state: 'ready' as const }
+    flow.resources.value = [resource, { ...resource, resourceId: 'removed', name: 'removed.png' }, { ...resource, draftId: 'draft-other', resourceId: 'other', name: 'other.png' }].map(resource => ({ accepted: true, canRetry: false, resource }))
+    insertChatComposerResources(flow.editor, ['current'], 'panel')
+    flow.editor.view.dom.focus()
+    flow.editor.commands.insertContent('@current')
+    await expect.poll(() => flow.composer.suggestions.value.map(item => item.option.label)).toEqual(['current.png'])
+    flow.keydown('Enter')
+    await expect.poll(() => flow.editor.view.dom.querySelectorAll('[data-type="chat-resource-reference"]').length).toBe(1)
+    expect(getChatComposerResourceIds(flow.editor.getJSON())).toEqual(['current'])
+    flow.composer.removeResource('current')
+    flow.editor.commands.insertContent('@')
+    await expect.poll(() => flow.composer.suggestions.value).toEqual([])
+    expect(flow.sent).toEqual([])
+  })
+
+  it('enters a directory with Tab, synchronizes a quoted path and selects a child with arrows and Enter', async () => {
+    const folder = { ...fileOption('media folder'), path: '/workspace/media folder', entryKind: 'directory' as const }
+    const children = Array.from({ length: 12 }, (_, index) => ({ ...fileOption(`file-${index}.txt`), path: `/workspace/media folder/file-${index}.txt` }))
+    const queries: (string | null)[] = []
+    const selections: BuddyComposerSource[] = []
+    const flow = await mountComposer({ loadContextOptions: async (query) => {
+      queries.push(query)
+      return { files: query === '' ? [folder] : children, skills: [] }
+    }, selectSource: async (source) => {
+      selections.push(source)
+      return 'chosen'
+    } })
+    flow.editor.view.dom.focus()
+    flow.editor.commands.insertContent('@')
+    await nextTick()
+    expect(flow.keydown('Tab').defaultPrevented).toBe(true)
+    await nextTick()
+    expect(flow.editor.getText()).toBe('@"/workspace/media folder/')
+    expect(queries).toContain('/workspace/media folder/')
+    expect(getChatComposerResourceIds(flow.editor.getJSON())).toEqual([])
+    for (let index = 0; index < 10; index++)
+      flow.keydown('ArrowDown')
+    flow.keydown('ArrowUp')
+    flow.keydown('Enter')
+    await nextTick()
+    expect(selections).toEqual([children[9]!.source])
+    await expect.poll(() => getChatComposerResourceIds(flow.editor.getJSON())).toEqual(['chosen'])
+    expect(flow.sent).toEqual([])
+  })
+
+  it('selects a directory itself on Enter and does not pick stale results during a new query', async () => {
+    const pending = deferred<ChatComposerContextOptions>()
+    const folder = { ...fileOption('folder'), path: '/workspace/folder', entryKind: 'directory' as const }
+    const selections: BuddyComposerSource[] = []
+    const flow = await mountComposer({ loadContextOptions: query => query === '' ? Promise.resolve({ files: [folder], skills: [] }) : pending.promise, selectSource: async (source) => {
+      selections.push(source)
+      return 'folder-resource'
+    } })
+    flow.editor.view.dom.focus()
+    flow.editor.commands.insertContent('@')
+    await nextTick()
+    flow.editor.commands.insertContent('new')
+    flow.keydown('Enter')
+    expect(selections).toEqual([])
+    expect(flow.sent).toEqual([])
+    pending.resolve({ files: [folder], skills: [] })
+    await nextTick()
+    await expect.poll(() => flow.composer.suggestions.value.length).toBe(1)
+    flow.keydown('Enter')
+    await nextTick()
+    await expect.poll(() => getChatComposerResourceIds(flow.editor.getJSON())).toEqual(['folder-resource'])
+    expect(flow.sent).toEqual([])
+  })
   it('retains unsupported saved model settings and blocks submission until the user selects supported values', async () => {
     const flow = await mountComposer({
       model: {

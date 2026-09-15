@@ -43,7 +43,7 @@ export function createMessageAttachmentReader(attachments: readonly AttachmentRe
 function readMessageAttachmentIds(content: unknown): string[] {
   const structured = readBuddyUserMessageContent(content)
   if (structured)
-    return structured.resourceSnapshots.map(snapshot => snapshot.attachmentId)
+    return structured.resourceSnapshots.flatMap(snapshot => snapshot.attachmentId ? [snapshot.attachmentId] : [])
   if (!content || typeof content !== 'object' || Array.isArray(content))
     return []
   const attachmentIds = (content as Record<string, unknown>).attachmentIds

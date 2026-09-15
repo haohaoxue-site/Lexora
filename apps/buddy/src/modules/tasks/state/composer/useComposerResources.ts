@@ -20,6 +20,7 @@ interface UseComposerResourcesOptions {
 export function useComposerResources(options: UseComposerResourcesOptions): ComposerResourcesState {
   const entries = shallowReactive(new Map<string, ComposerResourceView>())
   const sources = new Map<string, File>()
+  const localReferenceIds = new Set<string>()
   const accepting = new Set<Promise<void>>()
   const rejectedIds = shallowReactive(new Set<string>())
   const resources = computed(() => [...entries.values()].filter(entry => entry.resource.draftId === options.draftId.value))
@@ -60,7 +61,7 @@ export function useComposerResources(options: UseComposerResourcesOptions): Comp
     try {
       accepted = await options.api.accept({
         draftId,
-        resources: incoming.map(({ resourceId, name, nameSource, mimeType, sizeBytes, sourcePath }) => ({ resourceId, name, nameSource, mimeType, sizeBytes, sourcePath })),
+        resources: incoming.map(({ resourceId, name, nameSource, mimeType, sizeBytes, sourcePath }) => ({ resourceId, name, nameSource, mimeType, sizeBytes, sourcePath, storage: localReferenceIds.has(resourceId) ? 'reference' as const : 'snapshot' as const })),
       })
     }
     catch (error) {
@@ -91,7 +92,7 @@ export function useComposerResources(options: UseComposerResourcesOptions): Comp
       return []
     if (
       currentIds.size + files.length > BUDDY_ATTACHMENT_COUNT_LIMIT
-      || currentBytes + files.reduce((total, file) => total + file.size, 0) > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT
+      || currentBytes + files.reduce((total, file) => total + (window.lexoraDesktop?.clipboard.getFilePath(file) ? 0 : file.size), 0) > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT
     ) {
       options.onLimitExceeded()
       return []
@@ -101,6 +102,8 @@ export function useComposerResources(options: UseComposerResourcesOptions): Comp
       const resourceId = crypto.randomUUID()
       sources.set(resourceId, file)
       const sourcePath = window.lexoraDesktop?.clipboard.getFilePath(file) || undefined
+      if (sourcePath)
+        localReferenceIds.add(resourceId)
       const resource: BuddyComposerResource = {
         draftId,
         kind: getAttachmentKind(file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : BUDDY_MEDIA_EXTENSIONS[`.${file.name.split('.').at(-1)?.toLowerCase()}` as keyof typeof BUDDY_MEDIA_EXTENSIONS] ?? file.type),
@@ -217,7 +220,7 @@ export function useComposerResources(options: UseComposerResourcesOptions): Comp
 
   function totalBytes(ids: ReadonlySet<string>): number {
     return [...ids].reduce(
-      (total, id) => total + (entries.get(id)?.resource.sizeBytes ?? 0),
+      (total, id) => total + (entries.get(id)?.resource.localReference || localReferenceIds.has(id) ? 0 : entries.get(id)?.resource.sizeBytes ?? 0),
       0,
     )
   }

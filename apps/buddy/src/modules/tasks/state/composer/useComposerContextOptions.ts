@@ -21,7 +21,7 @@ export function useComposerContextOptions(options: ComposerContextOptions) {
   onScopeDispose(() => {
     scopeVersion += 1
   })
-  async function listContextOptions(fileQuery: string | null): Promise<ChatComposerContextOptions> {
+  async function listContextOptions(fileQuery: string | null, deepSearch = false): Promise<ChatComposerContextOptions> {
     const current = scopeVersion
     const spaceId = options.spaceId.value
     const request = {
@@ -29,22 +29,34 @@ export function useComposerContextOptions(options: ComposerContextOptions) {
       conversationId: options.activeConversationId.value,
       draftId: options.draftId.value,
       query: fileQuery ?? '',
+      deepSearch,
       spaceId,
     }
-    const [catalog, { files }] = await Promise.all([options.listSkills(spaceId), options.listSources(request)])
+    const catalog = fileQuery === null ? await options.listSkills(spaceId) : null
+    const sources = fileQuery === null ? null : await options.listSources(request)
     if (current !== scopeVersion)
       return { files: [], skills: [] }
     return {
-      files: files.map(file => ({
+      directory: sources?.directory,
+      files: (sources?.files ?? []).map(file => ({
         category: file.category,
-        description: file.description,
+        description: null,
+        fileName: file.name,
+        fileMetadata: {
+          mimeType: file.mimeType,
+          sizeBytes: file.sizeBytes,
+          createdAt: file.history?.createdAt,
+          messageNumber: file.history?.messageNumber,
+          nameSource: file.nameSource,
+        },
         kind: 'file' as const,
-        label: file.name,
+        entryKind: file.kind,
+        label: file.label,
         path: file.path,
         value: JSON.stringify(file.source),
         source: file.source,
       })),
-      skills: catalog.skills
+      skills: (catalog?.skills ?? [])
         .filter(isSkillAvailable)
         .map(skill => ({
           description: skill.description,

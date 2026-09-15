@@ -1,14 +1,7 @@
 import type { LocalAttachment } from '@buddy-shared/conversation/attachmentApi'
 import type { BuddyComposerResource } from '@buddy-shared/conversation/composerResource'
 
-export function getChatImageLabels(resources: readonly { resourceId: string, kind: string, nameSource?: 'file' | 'clipboard' }[]): Map<string, string> {
-  const labels = new Map<string, string>()
-  for (const resource of resources) {
-    if (resource.kind === 'image' && resource.nameSource === 'clipboard' && !labels.has(resource.resourceId))
-      labels.set(resource.resourceId, `[Image #${labels.size + 1}]`)
-  }
-  return labels
-}
+export { getChatImageLabels } from '@buddy-shared/conversation/imageLabels'
 
 export function resolveBuddyAttachmentPreviewUrl(attachment: LocalAttachment): string | null {
   if (attachment.kind !== 'image')
@@ -22,6 +15,8 @@ export function resolveComposerResourcePreviewUrl(resource: BuddyComposerResourc
     return null
   if ('attachmentId' in resource)
     return resource.previewUrl ?? `lexora-attachment://preview/${encodeURIComponent(resource.attachmentId)}`
+  if ('localReference' in resource.source)
+    return `lexora-attachment://local-preview/${encodeURIComponent(resource.draftId)}/${encodeURIComponent(resource.resourceId)}`
   if ('attachmentId' in resource.source)
     return `lexora-attachment://preview/${encodeURIComponent(resource.source.attachmentId)}`
   if ('artifactId' in resource.source)
