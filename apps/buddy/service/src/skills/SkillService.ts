@@ -4,6 +4,7 @@ import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import type { SkillInstallation, SkillRepository } from '../storage/skillRepository'
 import type { SpaceRepository } from '../storage/spaceRepository'
 import type { LoadedSkill } from './skillFiles'
+import type { ResolvedSkill } from './SkillPackageCache'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readdir, rm } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path'
@@ -12,6 +13,7 @@ import { registerRuntimeRequest } from '../rpc/runtimeRequest'
 import { discoverSkillFiles, readSkill, requireSkillPath, SkillError, skillIdentity } from './skillFiles'
 import { prepareSkillSource, writeSkillFiles } from './skillImport'
 import { SkillInspector } from './SkillInspector'
+import { SkillPackageCache } from './SkillPackageCache'
 
 export interface BuddySkillResolution {
   diagnostics: LocalSkillCatalog['diagnostics']
@@ -41,7 +43,7 @@ interface SkillServiceOptions {
 
 interface Candidate {
   entry: LocalSkill
-  loaded: LoadedSkill | null
+  loaded: ResolvedSkill | null
   priority: number
 }
 
@@ -56,6 +58,8 @@ export class SkillService {
   readonly #options: SkillServiceOptions
   readonly #previews = new Map<string, ImportPreview>()
   readonly #inspector: SkillInspector
+  readonly #packages = new SkillPackageCache()
+  readonly #resolutions = new Map<string, Promise<{ candidates: Candidate[], catalog: LocalSkillCatalog }>>()
   #mutation: Promise<unknown> = Promise.resolve()
 
   constructor(options: SkillServiceOptions) {
@@ -316,10 +320,31 @@ export class SkillService {
 
   async dispose() {
     await this.#mutation.catch(() => {})
+    await Promise.allSettled([...this.#resolutions.values()])
+    this.#packages.clear()
     await Promise.all([...this.#previews.keys()].map(id => this.discard(id)))
   }
 
-  async #resolve(spaceId: string | null) {
+  #resolve(spaceId: string | null) {
+    const space = this.#requireSpace(spaceId)
+    const scope = JSON.stringify(space?.primaryDirectory ?? null)
+    const key = JSON.stringify([spaceId, scope, this.#options.repository.list()])
+    const pending = this.#resolutions.get(key)
+    if (pending)
+      return pending
+    const resolving = this.#resolveCatalog(spaceId).then((result) => {
+      if (JSON.stringify(this.#requireSpace(spaceId)?.primaryDirectory ?? null) !== scope)
+        throw new SkillError('SKILL_CHANGED')
+      return result
+    }).finally(() => {
+      if (this.#resolutions.get(key) === resolving)
+        this.#resolutions.delete(key)
+    })
+    this.#resolutions.set(key, resolving)
+    return resolving
+  }
+
+  async #resolveCatalog(spaceId: string | null) {
     const space = this.#requireSpace(spaceId)
     const diagnostics: Array<{ code: 'SKILL_INVALID' | 'SKILL_NAME_COLLISION' | 'SKILL_PATH_OUTSIDE_SOURCE' | 'SKILL_SOURCE_UNREADABLE', message: string, path?: string }> = []
     const candidates: Candidate[] = []
@@ -332,13 +357,13 @@ export class SkillService {
         ? ['.agents', '.pi'].map(name => ({ root: join(space.primaryDirectory!.canonicalRoot, name, 'skills'), allowedRoot: space.primaryDirectory!.canonicalRoot, kind: 'directory' as const }))
         : []),
     ]
-    const discovered = new Map<string, LoadedSkill>()
+    const discovered = new Map<string, ResolvedSkill>()
     for (const source of sources) {
       try {
         const root = await requireSkillPath(source.allowedRoot, source.root)
         for (const path of await discoverSkillFiles(root, source.kind !== 'application', path => diagnostics.push({ code: 'SKILL_PATH_OUTSIDE_SOURCE', message: 'Skill source is outside the allowed folder or cannot be read.', path }))) {
           try {
-            const loaded = await readSkill(path, root)
+            const loaded = await this.#packages.load(path, root)
             const id = skillIdentity(source.kind === 'application' ? `application:${loaded.name}` : `${source.kind}:${path}`)
             if (source.kind === 'directory') {
               candidates.push({ loaded, priority: 1, entry: {
@@ -419,7 +444,7 @@ export class SkillService {
       if (record.managedBy === 'user') {
         try {
           await requireSkillPath(this.#options.paths.root, record.path)
-          loaded = await readSkill(record.path, this.#options.paths.skillsDirectory(record.spaceId))
+          loaded = await this.#packages.load(record.path, this.#options.paths.skillsDirectory(record.spaceId))
           if (loaded.name !== record.name)
             loaded = null
         }
