@@ -77,6 +77,7 @@ fn failure_protocol_preserves_classification_and_system_status_without_paths() {
             domain: SystemErrorDomain::Ntstatus,
             code: 0xc0000022,
         }),
+        acl: None,
     };
     assert_eq!(
         serde_json::to_value(failure).unwrap(),

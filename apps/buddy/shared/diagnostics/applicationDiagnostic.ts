@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { readLocalChatErrorCode } from '../runtime/localChatError'
+import { desktopBootstrapFailureSchema, processExitSchema, rendererLoadFailureSchema } from './desktopStartupDiagnostic'
 import { privateDirectoryErrorCodeSchema, privateDirectoryFailureSchema } from './privateDirectoryFailure'
 
 export const APPLICATION_DIAGNOSTIC_METHOD = 'application.diagnostic'
@@ -27,7 +28,11 @@ export const applicationDiagnosticSchema = z.object({
   durationMs: z.number().finite().nonnegative().optional(),
   errorCode: diagnosticCodeSchema.optional(),
   errorType: z.string().regex(/^[a-z]\w{0,95}$/i).optional(),
-  failure: privateDirectoryFailureSchema.optional(),
+  failure: z.union([privateDirectoryFailureSchema, desktopBootstrapFailureSchema]).optional(),
+  processExit: processExitSchema.optional(),
+  loadFailure: rendererLoadFailureSchema.optional(),
+  recoveryAction: z.enum(['retry', 'open_logs', 'show_directory', 'quit']).optional(),
+  previousLaunchId: z.uuid().optional(),
   count: z.number().int().nonnegative().optional(),
   attempt: z.number().int().nonnegative().optional(),
   method: z.string().regex(/^[a-z][a-z\d.]{0,95}$/i).optional(),
@@ -63,11 +68,12 @@ export function readDiagnosticError(error: unknown): DiagnosticError {
     if (!errorCode) {
       if (privateDirectoryCode.success)
         errorCode = privateDirectoryCode.data
-      else if (typeof code === 'string' && ['INITIAL_STATE_UNAVAILABLE', 'POWERSHELL_UNAVAILABLE', 'EACCES', 'EPERM', 'ENOENT', 'ENOSPC', 'EIO', 'EMFILE', 'ERR_SQLITE_ERROR'].includes(code))
+      else if (typeof code === 'string' && ['DESKTOP_BOOTSTRAP_FAILED', 'INITIAL_STATE_UNAVAILABLE', 'POWERSHELL_UNAVAILABLE', 'EACCES', 'EPERM', 'ENOENT', 'ENOSPC', 'EIO', 'EMFILE', 'ERR_SQLITE_ERROR'].includes(code))
         errorCode = code
     }
-    if (!failure && privateDirectoryCode.success) {
-      const parsed = privateDirectoryFailureSchema.safeParse('failure' in current ? current.failure : undefined)
+    if (!failure && (privateDirectoryCode.success || code === 'DESKTOP_BOOTSTRAP_FAILED')) {
+      const schema = privateDirectoryCode.success ? privateDirectoryFailureSchema : desktopBootstrapFailureSchema
+      const parsed = schema.safeParse('failure' in current ? current.failure : undefined)
       if (parsed.success)
         failure = parsed.data
     }

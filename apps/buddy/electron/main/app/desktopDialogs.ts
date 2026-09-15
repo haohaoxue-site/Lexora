@@ -2,14 +2,21 @@ import type { BrowserWindow, MessageBoxOptions } from 'electron'
 import type { LexoraConfig } from '../../shared/desktopApi'
 import type { LexoraConfigStore } from '../config/LexoraConfigStore'
 import type { DesktopEnvironment, DesktopQuitHost, DesktopQuitOptions } from './typing'
+import { randomUUID } from 'node:crypto'
+import process from 'node:process'
 import { app, dialog, ipcMain, Notification, shell } from 'electron'
 import { translateDesktopNative } from '../desktopNativeI18n'
 import { confirmDraftFlushBeforeQuit, requestRendererDraftFlush } from '../rendererDraftLifecycle'
+import { recoveryRelaunchArgs } from './desktopRecovery'
 import { describeDesktopStartupFailure, resolveStartupFailureDirectory } from './desktopStartupFailure'
 
 export async function showDesktopStartupFailure(error: unknown, language: LexoraConfig['desktop']['language'], environment?: Pick<DesktopEnvironment, 'paths' | 'diagnostics'>): Promise<void> {
   const directory = environment ? resolveStartupFailureDirectory(error, environment.paths) : undefined
-  const options = describeDesktopStartupFailure(error, language, environment?.diagnostics.launchId, directory)
+  const diagnostics = environment?.diagnostics
+  diagnostics?.record({ scope: 'desktop', level: 'info', event: 'startup.recovery.presented' })
+  const status = await diagnostics?.flushWithin()
+  const logsAvailable = !!status && status.written > 0 && status.failed === 0 && status.dropped === 0 && status.pendingBytes === 0 && status.unconfirmed === 0
+  const options = describeDesktopStartupFailure(error, language, diagnostics?.launchId, directory, logsAvailable)
   if (!app.isReady()) {
     dialog.showErrorBox(options.message, options.detail ?? '')
     return
@@ -20,23 +27,28 @@ export async function showDesktopStartupFailure(error: unknown, language: Lexora
   }
   while (true) {
     const { response } = await dialog.showMessageBox(options)
-    if (response === 0) {
-      app.relaunch()
-      return
-    }
-    if (response !== 1 && !(response === 2 && directory))
-      return
+    const recoveryAction = response === 0 ? 'retry' : response === 1 ? 'open_logs' : response === 2 && directory ? 'show_directory' : 'quit'
+    const operationId = randomUUID()
+    const context = { scope: 'desktop', recoveryAction, operationId } as const
+    environment.diagnostics.record({ ...context, level: 'info', event: 'startup.recovery.action_requested' })
     try {
-      if (response === 1) {
+      if (recoveryAction === 'retry') {
+        app.relaunch({ args: recoveryRelaunchArgs(process.argv, environment.diagnostics.launchId) })
+      }
+      else if (recoveryAction === 'open_logs') {
         if (await shell.openPath(environment.paths.logs))
           throw new Error('DIRECTORY_OPEN_FAILED')
       }
-      else if (directory) {
+      else if (recoveryAction === 'show_directory' && directory) {
         shell.showItemInFolder(directory)
       }
+      environment.diagnostics.record({ ...context, level: 'info', event: 'startup.recovery.action_dispatched' })
+      if (recoveryAction === 'retry' || recoveryAction === 'quit')
+        return
     }
     catch {
-      await dialog.showMessageBox({ type: 'warning', title: options.title, message: translateDesktopNative(language, 'directoryOpenFailed') })
+      environment.diagnostics.record({ ...context, level: 'warn', event: 'startup.recovery.action_failed', errorCode: recoveryAction === 'retry' ? 'RELAUNCH_FAILED' : 'DIRECTORY_OPEN_FAILED' })
+      await dialog.showMessageBox({ type: 'warning', title: options.title, message: translateDesktopNative(language, recoveryAction === 'retry' ? 'restartFailed' : 'directoryOpenFailed') })
     }
   }
 }

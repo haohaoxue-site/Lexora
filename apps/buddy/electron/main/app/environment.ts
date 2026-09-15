@@ -19,12 +19,13 @@ import { resolveBuddyRuntimePaths } from '../paths'
 import { desktopHosts } from '../platform/desktopHost'
 import { registerRendererSchemePrivileges } from '../rendererProtocol'
 import { resolveDesktopLaunchIntent } from '../startupIntent'
+import { bootstrapStep } from './desktopBootstrap'
 import { DesktopStartup } from './DesktopStartup'
 
 export function prepareDesktopEnvironment(): DesktopEnvironment {
   const desktopHost = desktopHosts[currentPlatform.id]
   const isSmokeTest = process.env.LEXORA_DESKTOP_SMOKE_TEST === '1'
-  const paths = resolveBuddyRuntimePaths({
+  const paths = bootstrapStep('resolve_paths', () => resolveBuddyRuntimePaths({
     defaultUserData: app.getPath('userData'),
     desktopName: buddyPackage.desktopName,
     isPackaged: app.isPackaged,
@@ -44,21 +45,7 @@ export function prepareDesktopEnvironment(): DesktopEnvironment {
     xdgConfigHome: process.env.XDG_CONFIG_HOME,
     xdgRuntimeDirectory: process.env.XDG_RUNTIME_DIR,
     xdgStateHome: process.env.XDG_STATE_HOME,
-  })
-  for (const directory of new Set([
-    paths.crashDumps,
-    paths.sessionData,
-    paths.userData,
-    dirname(paths.windowState),
-  ])) {
-    mkdirSync(directory, { mode: 0o700, recursive: true })
-  }
-  app.setName(paths.appName)
-  app.setPath('userData', paths.userData)
-  app.setPath('sessionData', paths.sessionData)
-  app.setPath('crashDumps', paths.crashDumps)
-  app.setAppLogsPath(paths.logs)
-  crashReporter.start({ productName: paths.appName, uploadToServer: false })
+  }))
   const diagnostics = new DesktopDiagnosticLogger({
     directory: paths.logs,
     appVersion: app.getVersion(),
@@ -68,9 +55,6 @@ export function prepareDesktopEnvironment(): DesktopEnvironment {
   const startup = new DesktopStartup(events)
   events.subscribe(event => diagnostics.record({ ...event, scope: 'desktop' }))
   events.subscribe(startup.observe)
-  registerAttachmentSchemePrivileges()
-  registerRendererSchemePrivileges()
-  desktopHost.setIdentity(paths.desktopName)
   return {
     diagnostics,
     events,
@@ -82,6 +66,32 @@ export function prepareDesktopEnvironment(): DesktopEnvironment {
     setAutostart: desktopHost.setAutostart,
     trayIconPath: paths.iconVariant === 'development' ? developmentTrayIconPath : stableDesktopIconPath,
   }
+}
+
+export function initializeDesktopEnvironment(environment: DesktopEnvironment): void {
+  const { paths } = environment
+  const directories = {
+    crash_dumps: paths.crashDumps,
+    session_data: paths.sessionData,
+    user_data: paths.userData,
+    window_state: dirname(paths.windowState),
+  } as const
+  for (const [role, directory] of Object.entries(directories)) {
+    bootstrapStep('create_directory', () => mkdirSync(directory, { mode: 0o700, recursive: true }), role as keyof typeof directories)
+  }
+  bootstrapStep('configure_paths', () => {
+    app.setName(paths.appName)
+    app.setPath('userData', paths.userData)
+    app.setPath('sessionData', paths.sessionData)
+    app.setPath('crashDumps', paths.crashDumps)
+    app.setAppLogsPath(paths.logs)
+  })
+  bootstrapStep('crash_reporter', () => crashReporter.start({ productName: paths.appName, uploadToServer: false }))
+  bootstrapStep('register_protocols', () => {
+    registerAttachmentSchemePrivileges()
+    registerRendererSchemePrivileges()
+  })
+  bootstrapStep('desktop_identity', () => desktopHosts[currentPlatform.id].setIdentity(paths.desktopName))
 }
 
 export async function prepareDesktopReady(environment: DesktopEnvironment): Promise<void> {

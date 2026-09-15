@@ -9,8 +9,9 @@ use windows_sys::Win32::{
             GetSecurityInfo, SDDL_REVISION_1, SE_FILE_OBJECT,
         },
         DACL_SECURITY_INFORMATION, GetAce, GetSecurityDescriptorDacl, GetSecurityDescriptorOwner,
-        INHERIT_ONLY_ACE, IsValidAcl, OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
-        WinBuiltinAdministratorsSid, WinCreatorOwnerSid, WinLocalSystemSid,
+        INHERIT_ONLY_ACE, IsValidAcl, OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
+        WinAuthenticatedUserSid, WinBuiltinAdministratorsSid, WinBuiltinAnyPackageSid,
+        WinBuiltinUsersSid, WinCreatorOwnerSid, WinLocalSystemSid, WinWorldSid,
     },
     Storage::FileSystem::{FILE_READ_ATTRIBUTES, READ_CONTROL, SYNCHRONIZE},
     System::{
@@ -19,6 +20,7 @@ use windows_sys::Win32::{
     },
 };
 
+use super::super::{DirectoryAclFailure, DirectoryAclReason, DirectoryPrincipal};
 use super::{DirectoryError, DirectoryFailure, DirectoryOperation, SystemErrorDomain};
 use crate::windows_security::{Sid, process_user_sid};
 
@@ -128,26 +130,67 @@ impl PrivateSecurity {
             ));
         }
         // SAFETY: The owner points into the live descriptor, or is null and rejected below.
-        if owner.is_null() || !unsafe { self.trusts(owner) } || present == 0 || acl.is_null() {
-            return Err(DirectoryFailure::new(
-                DirectoryError::Unsafe,
-                DirectoryOperation::ValidateAcl,
-            ));
+        if owner.is_null() {
+            return Err(DirectoryFailure::acl(DirectoryAclFailure::new(
+                DirectoryAclReason::OwnerMissing,
+            )));
+        }
+        // SAFETY: The non-null owner SID is backed by the live security descriptor.
+        let owner = unsafe { Sid::copy(owner) }.map_err(|_| {
+            DirectoryFailure::acl(DirectoryAclFailure::new(DirectoryAclReason::OwnerUntrusted))
+        })?;
+        if !self.trusted.contains(&owner) {
+            return Err(DirectoryFailure::acl(DirectoryAclFailure {
+                principal: Some(self.principal(&owner)),
+                ..DirectoryAclFailure::new(DirectoryAclReason::OwnerUntrusted)
+            }));
+        }
+        if present == 0 || acl.is_null() {
+            return Err(DirectoryFailure::acl(DirectoryAclFailure::new(
+                if present == 0 {
+                    DirectoryAclReason::DaclMissing
+                } else {
+                    DirectoryAclReason::NullDacl
+                },
+            )));
         }
         // SAFETY: The non-null ACL points into the live descriptor.
         if unsafe { IsValidAcl(acl) } == 0 {
-            return Err(DirectoryFailure::new(
-                DirectoryError::Unsafe,
-                DirectoryOperation::ValidateAcl,
-            ));
+            return Err(DirectoryFailure::acl(DirectoryAclFailure::new(
+                DirectoryAclReason::AclInvalid,
+            )));
         }
         // SAFETY: The ACL has been validated and its backing descriptor remains live throughout enumeration.
         unsafe { self.validate_acl(acl) }
     }
 
-    unsafe fn trusts(&self, sid: PSID) -> bool {
-        // SAFETY: The caller provides a SID backed by the validated, live security descriptor.
-        unsafe { Sid::copy(sid) }.is_ok_and(|sid| self.trusted.contains(&sid))
+    fn principal(&self, sid: &Sid) -> DirectoryPrincipal {
+        if sid == &self.trusted[0] {
+            return DirectoryPrincipal::CurrentUser;
+        }
+        if sid == &self.trusted[1] {
+            return DirectoryPrincipal::System;
+        }
+        if sid == &self.trusted[2] {
+            return DirectoryPrincipal::Administrators;
+        }
+        if sid == &self.creator_owner {
+            return DirectoryPrincipal::CreatorOwner;
+        }
+        for (kind, principal) in [
+            (WinWorldSid, DirectoryPrincipal::Everyone),
+            (WinBuiltinUsersSid, DirectoryPrincipal::BuiltinUsers),
+            (
+                WinAuthenticatedUserSid,
+                DirectoryPrincipal::AuthenticatedUsers,
+            ),
+            (WinBuiltinAnyPackageSid, DirectoryPrincipal::AllAppPackages),
+        ] {
+            if Sid::well_known(kind).is_ok_and(|known| sid == &known) {
+                return principal;
+            }
+        }
+        DirectoryPrincipal::Other
     }
 
     unsafe fn validate_acl(&self, acl: *const ACL) -> Result<(), DirectoryFailure> {
@@ -164,14 +207,19 @@ impl PrivateSecurity {
             }
             // SAFETY: GetAce succeeded for this entry within the live ACL.
             let header = unsafe { &*ace.cast::<ACE_HEADER>() };
+            let details = |reason| DirectoryAclFailure {
+                ace_index: Some(index),
+                ace_type: Some(header.AceType),
+                ace_flags: Some(header.AceFlags),
+                ..DirectoryAclFailure::new(reason)
+            };
             match u32::from(header.AceType) {
                 ACCESS_ALLOWED_ACE_TYPE => {
                     let offset = std::mem::offset_of!(ACCESS_ALLOWED_ACE, SidStart);
                     if usize::from(header.AceSize) < offset + 8 {
-                        return Err(DirectoryFailure::new(
-                            DirectoryError::Unsafe,
-                            DirectoryOperation::ValidateAcl,
-                        ));
+                        return Err(DirectoryFailure::acl(details(
+                            DirectoryAclReason::AceInvalid,
+                        )));
                     }
                     // SAFETY: This is a validated standard allow ACE; its inline SID begins at SidStart.
                     let sid = unsafe {
@@ -182,17 +230,13 @@ impl PrivateSecurity {
                     // SAFETY: The ACE includes the fixed eight-byte SID header checked above.
                     let sid_size = 8 + 4 * usize::from(unsafe { *sid.add(1) });
                     if sid_size > usize::from(header.AceSize) - offset {
-                        return Err(DirectoryFailure::new(
-                            DirectoryError::Unsafe,
-                            DirectoryOperation::ValidateAcl,
-                        ));
+                        return Err(DirectoryFailure::acl(details(
+                            DirectoryAclReason::AceInvalid,
+                        )));
                     }
                     // SAFETY: The inline SID remains backed by the live ACE in the descriptor.
                     let sid = unsafe { Sid::copy(sid.cast()) }.map_err(|_| {
-                        DirectoryFailure::new(
-                            DirectoryError::Unsafe,
-                            DirectoryOperation::ValidateAcl,
-                        )
+                        DirectoryFailure::acl(details(DirectoryAclReason::AceInvalid))
                     })?;
                     let owner_template = u32::from(header.AceFlags) & INHERIT_ONLY_ACE != 0
                         && sid == self.creator_owner;
@@ -200,18 +244,18 @@ impl PrivateSecurity {
                     let mask = unsafe { (*ace.cast::<ACCESS_ALLOWED_ACE>()).Mask };
                     let metadata_only = mask & !METADATA_READ_ACCESS == 0;
                     if !self.trusted.contains(&sid) && !owner_template && !metadata_only {
-                        return Err(DirectoryFailure::new(
-                            DirectoryError::Unsafe,
-                            DirectoryOperation::ValidateAcl,
-                        ));
+                        return Err(DirectoryFailure::acl(DirectoryAclFailure {
+                            access_mask: Some(mask),
+                            principal: Some(self.principal(&sid)),
+                            ..details(DirectoryAclReason::UntrustedAccess)
+                        }));
                     }
                 }
                 ACCESS_DENIED_ACE_TYPE => {}
                 _ => {
-                    return Err(DirectoryFailure::new(
-                        DirectoryError::Unsafe,
-                        DirectoryOperation::ValidateAcl,
-                    ));
+                    return Err(DirectoryFailure::acl(details(
+                        DirectoryAclReason::UnsupportedAce,
+                    )));
                 }
             }
         }

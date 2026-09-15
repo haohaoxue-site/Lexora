@@ -20,14 +20,10 @@ fn rejects_null_dacl_untrusted_owner_and_allow_ace_variants_not_in_contract() {
         r#"O:SYD:P(XA;;FR;;;WD;(@User.Title=="PM"))"#,
     ] {
         let descriptor = from_sddl(sddl).unwrap_or_else(|error| panic!("{sddl}: {error}"));
-        assert_eq!(
-            security.validate_descriptor(&descriptor),
-            Err(DirectoryFailure::new(
-                DirectoryError::Unsafe,
-                DirectoryOperation::ValidateAcl
-            )),
-            "{sddl}"
-        );
+        let failure = security.validate_descriptor(&descriptor).unwrap_err();
+        assert_eq!(failure.code, DirectoryError::Unsafe, "{sddl}");
+        assert_eq!(failure.operation, DirectoryOperation::ValidateAcl, "{sddl}");
+        assert!(failure.acl.is_some(), "{sddl}");
     }
 }
 
@@ -94,12 +90,53 @@ fn metadata_grants_do_not_hide_data_access_changes_or_unknown_rights() {
             let sddl = format!("O:SYD:P(A;OICI;FA;;;SY)(A;{flags};{mask:#x};;;WD)");
             assert_eq!(
                 security.validate_descriptor(&from_sddl(&sddl).unwrap()),
-                Err(DirectoryFailure::new(
-                    DirectoryError::Unsafe,
-                    DirectoryOperation::ValidateAcl
-                )),
+                Err(DirectoryFailure::acl(DirectoryAclFailure {
+                    reason: DirectoryAclReason::UntrustedAccess,
+                    ace_index: Some(1),
+                    ace_type: Some(0),
+                    ace_flags: Some(if flags.is_empty() { 0 } else { 11 }),
+                    access_mask: Some(mask),
+                    principal: Some(DirectoryPrincipal::Everyone),
+                })),
                 "{sddl}"
             );
         }
+    }
+}
+
+#[test]
+fn rejection_diagnostics_classify_principals_without_serializing_sids() {
+    let security = PrivateSecurity::new().unwrap();
+    for (sid, principal) in [
+        ("WD", "everyone"),
+        ("BU", "builtin_users"),
+        ("AU", "authenticated_users"),
+        ("AC", "all_app_packages"),
+        ("CO", "creator_owner"),
+        ("S-1-5-21-1-2-3-1001", "other"),
+    ] {
+        let descriptor = from_sddl(&format!("O:SYD:P(A;OICIID;0x81;;;{sid})")).unwrap();
+        let failure = security.validate_descriptor(&descriptor).unwrap_err();
+        assert_eq!(
+            serde_json::to_value(&failure).unwrap()["acl"],
+            serde_json::json!({
+                "reason": "untrusted_access", "aceIndex": 0, "aceType": 0,
+                "aceFlags": 19, "accessMask": 129, "principal": principal,
+            })
+        );
+        assert!(!serde_json::to_string(&failure).unwrap().contains("S-1-"));
+    }
+    for (sddl, reason) in [
+        ("O:SYD:NO_ACCESS_CONTROL", DirectoryAclReason::NullDacl),
+        ("O:WDD:P(A;;FA;;;SY)", DirectoryAclReason::OwnerUntrusted),
+        (
+            r#"O:SYD:P(XA;;FR;;;WD;(@User.Title=="PM"))"#,
+            DirectoryAclReason::UnsupportedAce,
+        ),
+    ] {
+        let failure = security
+            .validate_descriptor(&from_sddl(sddl).unwrap())
+            .unwrap_err();
+        assert_eq!(failure.acl.unwrap().reason, reason, "{sddl}");
     }
 }
