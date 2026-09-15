@@ -96,6 +96,7 @@ export default {
   'desktop.approval.shell.reason.sandbox-bypass': 'This command runs outside the sandbox and can access your files, credentials, network and desktop services.',
   'desktop.approval.sandbox.hostScope': 'Runs on the host without sandbox filesystem or network restrictions',
   'desktop.approval.sandbox.isolatedScope': 'Runs inside the sandbox; filesystem and network restrictions remain enforced',
+  'desktop.approval.sandbox.networkTitle': 'Run command · Network access required',
   'desktop.approval.sandbox.networkScope': 'Confirm execution allows this command to reach this host and port and may send content from authorized directories. Choose a scope in more actions to authorize later commands.',
   'desktop.approval.automation.executionProfile': 'Permissions',
   'desktop.approval.kind.read': 'Read operation',

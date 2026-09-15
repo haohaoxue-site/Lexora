@@ -1,3 +1,4 @@
+import type { SandboxNetworkTarget } from '../../../shared/permissions/shellSandbox'
 import type { BuddyCapability } from '../agent/extensions/BuddyCapability'
 import type { BuddyExtensionRunContext } from '../agent/extensions/BuddyExtensionRunContext'
 import type { DirectoryGrant } from '../directories/resolveGrantedPath'
@@ -5,9 +6,11 @@ import type { ToolAuthorizationService } from '../permissions/ToolAuthorizationS
 import type { SandboxDirectoryPermissions } from './SandboxDirectoryPermissions'
 import type { ShellExecution } from './shellExecution'
 import type { ShellSandboxClient } from './ShellSandboxClient'
+import { Buffer } from 'node:buffer'
 import { createBashToolDefinition, createPowerShellToolDefinition, defineTool } from '@earendil-works/pi-coding-agent'
 import { Type } from 'typebox'
 import { ShellSandboxError } from '../../../shared/permissions/shellSandbox'
+import { ApprovalCancelledError, ApprovalExpiredError } from '../approvals/ApprovalService'
 
 export const SHELL_SANDBOX_EXTENSION = 'lexora-shell-sandbox'
 
@@ -59,25 +62,50 @@ export function createShellCapability(options: {
             const tool = createShell(options.cwd, {
               exposeSessionEnvironment: false,
               operations: {
-                exec: (command, cwd, execOptions) => options.sandbox!.exec({
-                  command,
-                  cwd,
-                  readOnly: options.execution.readOnly,
-                  roots: [...new Set(options.getGrants().map(grant => grant.canonicalRoot))],
-                  workspaceRoots: options.getGrants().filter(grant => grant.kind === 'workspace').map(grant => grant.canonicalRoot),
-                  additionalDirectories: options.directoryPermissions.get(run),
-                  resourceReadRoots: [...(options.resourceReadRoots ?? [])],
-                  timeout: execOptions.timeout,
-                }, { ...execOptions, signal: executionSignal }, async (target) => {
-                  if (executionSignal.aborted)
-                    return false
-                  const reason = await options.authorization.authorize({
-                    input: parameters,
-                    toolCallId,
-                    toolName: shellName,
-                  }, run, { access: 'network', requireApproval: true }, { network: target, signal: executionSignal })
-                  return reason === null
-                }),
+                exec: async (command, cwd, execOptions) => {
+                  const failures: (SandboxNetworkTarget & { code: string })[] = []
+                  let omitted = 0
+                  const recordFailure = (target: SandboxNetworkTarget, code: string) => {
+                    if (failures.length < 16)
+                      failures.push({ ...target, code })
+                    else
+                      omitted++
+                  }
+                  try {
+                    return await options.sandbox!.exec({
+                      command,
+                      cwd,
+                      readOnly: options.execution.readOnly,
+                      roots: [...new Set(options.getGrants().map(grant => grant.canonicalRoot))],
+                      workspaceRoots: options.getGrants().filter(grant => grant.kind === 'workspace').map(grant => grant.canonicalRoot),
+                      additionalDirectories: options.directoryPermissions.get(run),
+                      resourceReadRoots: [...(options.resourceReadRoots ?? [])],
+                      timeout: execOptions.timeout,
+                    }, { ...execOptions, signal: executionSignal }, async (target) => {
+                      if (executionSignal.aborted)
+                        return false
+                      try {
+                        const reason = await options.authorization.authorize({
+                          input: parameters,
+                          toolCallId,
+                          toolName: shellName,
+                        }, run, { access: 'network', requireApproval: true }, { network: target, signal: executionSignal })
+                        if (reason !== null)
+                          recordFailure(target, reason)
+                        return reason === null
+                      }
+                      catch (error) {
+                        recordFailure(target, error instanceof ApprovalCancelledError || error instanceof ApprovalExpiredError ? error.code : 'NETWORK_APPROVAL_FAILED')
+                        throw error
+                      }
+                    })
+                  }
+                  finally {
+                    if (failures.length && !executionSignal.aborted) {
+                      execOptions.onData(Buffer.from(`\n[Network authorization]\n${JSON.stringify({ requests: failures, omitted })}\nThese requests were not authorized. Do not retry a declined or cancelled request through another command or tool. An authorization error does not mean the user refused. These facts do not diagnose other command failures or override its exit status.\n`))
+                    }
+                  }
+                },
               },
             })
             try {
