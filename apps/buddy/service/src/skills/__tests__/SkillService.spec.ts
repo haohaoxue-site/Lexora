@@ -84,6 +84,39 @@ describe('skillService', () => {
     expect((await fixture.service.list(null)).skills).toEqual([])
   })
 
+  it('rejects a queued reference immediately after a supporting resource changes', async () => {
+    const fixture = await createFixture()
+    await writeSkill(fixture.global, 'mutable', 'unchanged entry')
+    const resource = join(fixture.global, 'mutable', 'guide.md')
+    await writeFile(resource, 'version one')
+    const first = await fixture.service.loadForSpace(null)
+    await writeFile(resource, 'version two')
+
+    await expect(fixture.service.materializeForSpace(null, first.references)).rejects.toMatchObject({ code: 'SKILL_CHANGED' })
+    const second = await fixture.service.loadForSpace(null)
+    expect(second.revision).not.toBe(first.revision)
+    expect((await fixture.service.materializeForSpace(null, second.references))[0]?.body).toBe('# mutable')
+  })
+
+  it('rejects a pending resolution when the Space directory binding is cleared', async () => {
+    const fixture = await createFixture()
+    await writeSkill(join(fixture.trustedSpace, '.agents', 'skills'), 'trusted', 'trusted skill')
+    fixture.spaces.create(spaceInput('space-trusted', fixture.trustedSpace))
+    const pending = fixture.service.loadForSpace('space-trusted')
+    fixture.spaces.update({
+      id: 'space-trusted',
+      name: 'Trusted',
+      memoryScope: 'space_only',
+      primaryDirectory: null,
+      additionalDirectories: [],
+      updatedAt: now,
+      event: { id: 'clear-directory', eventType: 'space.config.updated', spaceId: 'space-trusted', createdAt: now, payload: {} },
+    })
+
+    await expect(pending).rejects.toMatchObject({ code: 'SKILL_CHANGED' })
+    expect((await fixture.service.loadForSpace('space-trusted')).skills).toEqual([])
+  })
+
   it('does not let a skill file symlink leave its resolved skills directory', async () => {
     const fixture = await createFixture()
     const skillsDirectory = join(fixture.trustedSpace, '.agents', 'skills')
