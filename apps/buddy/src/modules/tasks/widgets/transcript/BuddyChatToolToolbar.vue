@@ -5,7 +5,7 @@ import { useTimeoutFn } from '@vueuse/core'
 import { onScopeDispose, shallowRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
-import { useChatToolActions } from './chatToolActionsContext'
+import { useChatContent } from './chatContentContext'
 
 const props = defineProps<{
   language: BuddyLocale
@@ -15,7 +15,7 @@ const props = defineProps<{
   copyLabel?: string
 }>()
 const { t } = useBuddyI18n(() => props.language)
-const actions = useChatToolActions()
+const actions = useChatContent()
 const copyState = shallowRef<'idle' | 'copied' | 'failed'>('idle')
 const copyReset = useTimeoutFn(() => copyState.value = 'idle', 1_400, { immediate: false })
 let disposed = false

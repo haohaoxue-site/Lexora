@@ -5,6 +5,7 @@ import { usePreferredReducedMotion } from '@vueuse/core'
 import MarkdownRender from 'markstream-vue'
 import { computed, onBeforeUnmount } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 import 'markstream-vue/index.css'
 
 const props = withDefaults(defineProps<{
@@ -23,6 +24,7 @@ interface CopyButtonState {
 }
 
 const { t } = useBuddyI18n(() => props.language)
+const { isDark } = useDesktopUi()
 const copyButtonStates = new Map<HTMLButtonElement, CopyButtonState>()
 
 const smoothStreamingOptions = {
@@ -106,6 +108,7 @@ onBeforeUnmount(() => {
       :fade="false"
       :final="final"
       html-policy="escape"
+      :is-dark="isDark"
       :max-live-nodes="animateStreaming ? 0 : undefined"
       mode="chat"
       :parse-coalesce-ms="32"
@@ -129,10 +132,8 @@ onBeforeUnmount(() => {
 .buddy-chat-markdown {
   width: 100%;
   min-width: 0;
-  color: inherit;
 }
 
-// 样式修正覆盖
 .buddy-chat-markdown-host :deep(.markstream-vue) {
   --ms-font-sans: var(--buddy-font-ui);
   --ms-font-mono: var(--buddy-font-mono);
@@ -178,30 +179,6 @@ onBeforeUnmount(() => {
   --ms-flow-heading-6-mt: 0.75rem;
   --ms-flow-heading-6-mb: 0.25rem;
   --ms-inset-panel-body: 0.875rem;
-  --link-color: var(--buddy-accent-text);
-  --code-bg: var(--buddy-surface-raised);
-  --code-fg: var(--buddy-chat-code-color);
-  --code-border: var(--buddy-border-subtle);
-  --inline-code-bg: var(--buddy-accent-surface);
-  --inline-code-fg: var(--buddy-accent-on-surface);
-  --inline-code-border: var(--buddy-accent-border);
-  --blockquote-border: var(--buddy-border-subtle);
-  --table-border: var(--buddy-border-subtle);
-  --table-header-bg: var(--buddy-surface-subtle);
-  --list-marker: var(--buddy-text-muted);
-  --list-counter-marker: var(--buddy-text-secondary);
-  --hr-border: var(--buddy-border-subtle);
-  --footnote-border: var(--buddy-border-subtle);
-  --admonition-bg: var(--buddy-surface-subtle);
-  --admonition-border: var(--buddy-border-subtle);
-  --admonition-fg: var(--buddy-text-primary);
-  --admonition-muted: var(--buddy-text-secondary);
-  --diagram-bg: var(--buddy-surface-subtle);
-  --diagram-border: var(--buddy-border-subtle);
-  --diagram-header-bg: var(--buddy-surface-raised);
-  --loading-spinner: var(--buddy-text-secondary);
-  --loading-shimmer: var(--buddy-surface-subtle);
-  --image-placeholder-bg: var(--buddy-surface-subtle);
 }
 
 .buddy-chat-markdown-host :deep(.code-block-header),
@@ -228,8 +205,8 @@ onBeforeUnmount(() => {
 
 :global(.buddy-chat-markdown .code-action-btn.is-buddy-copied) {
   position: relative;
-  background: var(--buddy-accent-surface);
-  color: var(--buddy-accent-text);
+  background: var(--code-action-active-bg);
+  color: var(--code-action-active-fg);
 }
 
 :global(.buddy-chat-markdown .code-action-btn.is-buddy-copied svg) {

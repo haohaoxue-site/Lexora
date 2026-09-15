@@ -13,7 +13,7 @@ import BuddyChatReasoningRow from './BuddyChatReasoningRow.vue'
 import BuddyChatToolDetails from './BuddyChatToolDetails.vue'
 import BuddyChatToolIcon from './BuddyChatToolIcon.vue'
 import BuddyChatToolRow from './BuddyChatToolRow.vue'
-import { useChatToolActions } from './chatToolActionsContext'
+import { useChatContent } from './chatContentContext'
 
 const props = defineProps<{
   group: ChatAgentActivityGroup
@@ -22,7 +22,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ toggleEntry: [id: string], openEntry: [id: string] }>()
 const { t } = useBuddyI18n(() => props.language)
-const actions = useChatToolActions()
+const actions = useChatContent()
 const open = shallowRef(false)
 const highlightedIssue = shallowRef<string | null>(null)
 const content = useTemplateRef<HTMLDivElement>('content')

@@ -1,57 +1,50 @@
 <script setup lang="ts">
+import type { DesktopShellBindings } from './desktopShellBindings'
 import { computed } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import DesktopStartupScreen from '@/app/bootstrap/DesktopStartupScreen.vue'
-import { useDesktopApp } from '@/app/desktopAppContext'
 import DesktopAppSidebar from '@/app/shell/DesktopAppSidebar.vue'
 import DesktopTitleBar from '@/app/shell/window/DesktopTitleBar.vue'
 import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 
+const { bindings } = defineProps<{ bindings: DesktopShellBindings }>()
 const route = useRoute()
 const router = useRouter()
-const { lifecycle, appInfo, appSidebarCollapsed, language, navigation, notifications, taskIndex, toggleAppSidebar } = useDesktopApp()
-const { spaces, tasks: taskItems } = taskIndex
-const {
-  items: notificationItems,
-  isLoading: notificationLoading,
-  unseenCount: notificationUnseenCount,
-  load: loadNotifications,
-  markAllSeen: markAllNotificationsSeen,
-} = notifications
-const startupVisible = computed(() => !lifecycle.state.value.hasBeenReady && route.meta.settingsCategory !== 'logs')
-const startupFailed = lifecycle.failed
+const { appSidebarCollapsed, language } = useDesktopUi()
+const startupVisible = computed(() => !bindings.lifecycle.state.value.hasBeenReady && route.meta.settingsCategory !== 'logs')
 const activeView = computed(() => route.meta.desktopView ?? 'tasks')
 </script>
 
 <template>
   <div class="desktop-shell">
     <DesktopTitleBar
-      :app-info="appInfo"
+      :app-info="bindings.appInfo.value"
       :app-sidebar-collapsed="appSidebarCollapsed"
       :language="language"
-      @toggle-app-sidebar="toggleAppSidebar"
+      @toggle-app-sidebar="bindings.toggleAppSidebar"
     />
     <div class="desktop-shell__body">
       <div class="desktop-shell__content" :class="{ 'is-starting': startupVisible }" :inert="startupVisible" :aria-hidden="startupVisible">
         <Transition name="desktop-app-sidebar">
           <DesktopAppSidebar
             v-if="!appSidebarCollapsed"
-            :app-version="appInfo?.version ?? null"
-            :conversations="taskItems"
+            :app-version="bindings.appInfo.value?.version ?? null"
+            :conversations="bindings.taskIndex.tasks.value"
             :language="language"
             :mode="activeView"
-            :notification-items="notificationItems"
-            :notification-loading="notificationLoading"
-            :notification-unseen-count="notificationUnseenCount"
-            :spaces="spaces"
-            @navigate-tasks="navigation.navigate(desktopRouteLocations.tasks())"
-            @navigate-automations="navigation.navigate(desktopRouteLocations.automations())"
-            @navigate-settings="navigation.navigate(desktopRouteLocations.settings())"
-            @mark-all-notifications-seen="markAllNotificationsSeen"
-            @open-notification="navigation.openNotification"
-            @open-task="navigation.openTask"
-            @open-space="navigation.openSpace"
-            @refresh-notifications="loadNotifications"
+            :notification-items="bindings.notifications.items.value"
+            :notification-loading="bindings.notifications.isLoading.value"
+            :notification-unseen-count="bindings.notifications.unseenCount.value"
+            :spaces="bindings.taskIndex.spaces.value"
+            @navigate-tasks="bindings.navigation.navigate(desktopRouteLocations.tasks())"
+            @navigate-automations="bindings.navigation.navigate(desktopRouteLocations.automations())"
+            @navigate-settings="bindings.navigation.navigate(desktopRouteLocations.settings())"
+            @mark-all-notifications-seen="bindings.notifications.markAllSeen"
+            @open-notification="bindings.navigation.openNotification"
+            @open-task="bindings.navigation.openTask"
+            @open-space="bindings.navigation.openSpace"
+            @refresh-notifications="bindings.notifications.load"
           />
         </Transition>
 
@@ -60,7 +53,7 @@ const activeView = computed(() => route.meta.desktopView ?? 'tasks')
         </div>
       </div>
       <Transition name="desktop-startup-reveal">
-        <DesktopStartupScreen v-if="startupVisible" :failed="startupFailed" :language="language" @retry="lifecycle.retry()" @open-logs="router.push(desktopRouteLocations.settings('logs'))" />
+        <DesktopStartupScreen v-if="startupVisible" :failed="bindings.lifecycle.failed.value" :language="language" @retry="bindings.lifecycle.retry()" @open-logs="router.push(desktopRouteLocations.settings('logs'))" />
       </Transition>
     </div>
   </div>

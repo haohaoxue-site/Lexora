@@ -9,10 +9,10 @@ import { useTimeoutFn } from '@vueuse/core'
 import { NButton, NTooltip, useMessage } from 'naive-ui'
 import { shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
-import { useTaskContext } from '@/modules/tasks/taskContext'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import { formatChatMessageTimeLabel } from '../../model/transcript/chatMessageTime'
 import BuddyChatTokenUsage from './BuddyChatTokenUsage.vue'
+import { useChatContent } from './chatContentContext'
 
 const props = defineProps<{
   actions: ChatMessageActions
@@ -32,7 +32,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
-const { clipboard } = useTaskContext()
+const { writeClipboardText } = useChatContent()
 const notification = useMessage()
 const copied = shallowRef(false)
 const copyReset = useTimeoutFn(() => copied.value = false, 1_400, { immediate: false })
@@ -41,7 +41,7 @@ async function copyContent() {
   if (!props.copyText)
     return
   try {
-    await clipboard.writeText(props.copyText)
+    await writeClipboardText(props.copyText)
     copied.value = true
     copyReset.stop()
     copyReset.start()

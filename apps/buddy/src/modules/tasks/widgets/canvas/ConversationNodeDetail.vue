@@ -5,12 +5,12 @@ import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { Dismiss20Regular, Edit20Regular, Keyboard20Regular, Wand20Regular } from '@vicons/fluent'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
-import { useTaskContext } from '../../taskContext'
 import BuddyChatAgentTurn from '../transcript/BuddyChatAgentTurn.vue'
 import BuddyChatCompactionRow from '../transcript/BuddyChatCompactionRow.vue'
 import BuddyChatMessageBody from '../transcript/BuddyChatMessageBody.vue'
 import BuddyChatRunActivity from '../transcript/BuddyChatRunActivity.vue'
 import BuddyChatTokenUsage from '../transcript/BuddyChatTokenUsage.vue'
+import { useChatContent } from '../transcript/chatContentContext'
 import { useChatActivityNavigation } from '../transcript/useChatActivityNavigation'
 
 const props = defineProps<{
@@ -24,7 +24,7 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ close: [], reload: [], edit: [], openArtifact: [id: string], openChanges: [id: string] }>()
 const { t } = useBuddyI18n(() => props.language)
-const { clipboard } = useTaskContext()
+const { writeClipboardText } = useChatContent()
 const activityNavigation = useChatActivityNavigation()
 </script>
 
@@ -53,7 +53,7 @@ const activityNavigation = useChatActivityNavigation()
         <div v-if="row.kind === 'message'" class="conversation-node-detail__message" :data-message-id="row.message.id">
           <BuddyChatMessageBody
             :message="row.message" :language="language" :final="!row.streaming" :result-run-id="row.resultRunId"
-            :turn-outputs="row.turnOutputs" :turn-changes="row.turnChanges" :write-clipboard-text="clipboard.writeText"
+            :turn-outputs="row.turnOutputs" :turn-changes="row.turnChanges" :write-clipboard-text="writeClipboardText"
             @open-artifact="emit('openArtifact', $event)" @open-changes="emit('openChanges', $event)"
           />
           <BuddyChatTokenUsage v-if="row.turnUsage && !row.streaming" :usage="row.turnUsage" :language="language" />

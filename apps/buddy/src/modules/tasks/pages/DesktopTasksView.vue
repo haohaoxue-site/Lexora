@@ -2,18 +2,19 @@
 import type { LocalArtifact } from '@buddy-shared/artifacts/artifactApi'
 import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
 import type { LocalRunOutput } from '@buddy-shared/runs/runApi'
-import { computed, provide, shallowRef, watch } from 'vue'
+import { computed, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTaskContext } from '@/modules/tasks/taskContext'
 import DesktopTaskSpaceSelector from '@/modules/tasks/widgets/composer/DesktopTaskSpaceSelector.vue'
 import DesktopTaskResourcePanel from '@/modules/tasks/widgets/context-panel/DesktopTaskResourcePanel.vue'
 import { useTaskResourcePanel } from '@/modules/tasks/widgets/context-panel/useTaskResourcePanel'
 import DesktopTaskIndex from '@/modules/tasks/widgets/task-index/DesktopTaskIndex.vue'
-import { chatToolActionsKey } from '@/modules/tasks/widgets/transcript/chatToolActionsContext'
+import { useProvideChatContent } from '@/modules/tasks/widgets/transcript/chatContentContext'
 import DesktopChatWorkspace from '@/modules/tasks/widgets/workspace/DesktopChatWorkspace.vue'
 import DesktopChatWorkspaceHeader from '@/modules/tasks/widgets/workspace/DesktopChatWorkspaceHeader.vue'
 import { useConversationSearch } from '@/modules/tasks/widgets/workspace/useConversationSearch'
 import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 import DesktopWorkbenchLayout from '@/shared/ui/workbench-layout/DesktopWorkbenchLayout.vue'
 
 const router = useRouter()
@@ -22,9 +23,9 @@ const {
   clipboard,
   tasks,
   notificationTargetMessageId,
-  appSidebarCollapsed,
 } = useTaskContext()
-const { language, workspace } = tasks
+const { language, appSidebarCollapsed } = useDesktopUi()
+const { workspace } = tasks
 const { pinnedItems, spaces, tasks: taskItems, ...indexActions } = tasks.index
 const { activeSpace, activeTaskId, currentTitle, openTask, startTask } = tasks.session
 const chatSession = workspace.session
@@ -55,7 +56,7 @@ const contextActions = useTaskResourcePanel({
   runOutputs: panelOutputs,
 })
 const { artifactCount, isOpen: contextOpen } = contextActions
-provide(chatToolActionsKey, {
+useProvideChatContent({
   canPreviewFile: contextActions.canPreviewFile,
   previewFile: contextActions.previewFile,
   writeClipboardText: text => clipboard.writeText(text),

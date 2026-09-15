@@ -3,6 +3,7 @@ import type { LocalSkill, SkillDetail } from '@buddy-shared/skills/skillApi'
 import { NAlert, NDrawer, NDrawerContent, NScrollbar, NSpin, NTab, NTabs, NTag } from 'naive-ui'
 import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 import DesktopMonacoFile from '@/shared/ui/files/DesktopMonacoFile.vue'
 import DesktopMarkdownContent from '@/shared/ui/markdown/DesktopMarkdownContent.vue'
 import { useSkillsContext } from '../skillsContext'
@@ -20,7 +21,8 @@ const props = defineProps<{
   related: readonly LocalSkill[]
 }>()
 const emit = defineEmits<{ close: [], closed: [], update: [skill: LocalSkill], remove: [skill: LocalSkill], reveal: [skill: LocalSkill], global: [], locate: [skill: LocalSkill] }>()
-const { language, writeClipboardText } = useSkillsContext()
+const { writeClipboardText } = useSkillsContext()
+const { language } = useDesktopUi()
 const { t } = useBuddyI18n(language)
 const skill = computed(() => props.detail?.skill ?? props.selected)
 const tab = shallowRef<'description' | 'files'>('description')

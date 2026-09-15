@@ -1,5 +1,5 @@
 export type { ApplicationSettings } from './contracts'
-export { settingsContextKey, useSettingsContext } from './settingsContext'
+export { useProvideSettingsContext, useSettingsContext } from './settingsContext'
 export type { DesktopDataSettingsCapability } from './state/desktopDataSettingsCapability'
 export { createDesktopDataSettingsCapability } from './state/desktopDataSettingsCapability'
 export type { ApplicationSettingsStore } from './state/useApplicationSettingsStore'

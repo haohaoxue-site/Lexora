@@ -13,10 +13,10 @@ import { projectChatMessageActions } from '../../model/transcript/chatMessageAct
 import {
   getChatMessageDisplayText,
 } from '../../model/transcript/chatMessageContent'
-import { useTaskContext } from '../../taskContext'
 import BuddyChatActionToolbar from './BuddyChatActionToolbar.vue'
 import BuddyChatAgentIdentity from './BuddyChatAgentIdentity.vue'
 import BuddyChatMessageBody from './BuddyChatMessageBody.vue'
+import { useChatContent } from './chatContentContext'
 
 const props = defineProps<{
   actionsDisabled: boolean
@@ -44,7 +44,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
-const { clipboard } = useTaskContext()
+const { writeClipboardText } = useChatContent()
 const actions = computed(() => projectChatMessageActions(props.message, props.actionsDisabled))
 const showAssistantIdentity = computed(() => (
   props.message.role === 'assistant' && props.showIdentity !== false
@@ -100,7 +100,7 @@ const messageText = computed(() => getChatMessageDisplayText(
     </div>
     <BuddyChatMessageBody
       :final="!streaming" :language="language" :message="message" :result-run-id="resultRunId"
-      :turn-outputs="turnOutputs" :turn-changes="turnChanges" :write-clipboard-text="clipboard.writeText"
+      :turn-outputs="turnOutputs" :turn-changes="turnChanges" :write-clipboard-text="writeClipboardText"
       @open-artifact="emit('openArtifact', $event)" @open-changes="emit('openChanges', $event)"
     />
     <BuddyChatActionToolbar

@@ -6,7 +6,7 @@ import { computed } from 'vue'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import { canExpandChatTool, describeChatTool, isChatToolActive, isChatToolIssue } from '../../model/transcript/chatToolDisplay'
 import BuddyChatToolIcon from './BuddyChatToolIcon.vue'
-import { useChatToolActions } from './chatToolActionsContext'
+import { useChatContent } from './chatContentContext'
 
 const props = defineProps<{
   language: BuddyLocale
@@ -18,7 +18,7 @@ const props = defineProps<{
   highlighted?: boolean
 }>()
 const emit = defineEmits<{ toggle: [] }>()
-const actions = useChatToolActions()
+const actions = useChatContent()
 const display = computed(() => describeChatTool(props.node, props.language))
 const canExpand = computed(() => canExpandChatTool(props.node, actions.canPreviewFile))
 const active = computed(() => isChatToolActive(props.node))

@@ -3,12 +3,11 @@ import { RouterView, useRouter } from 'vue-router'
 import { useAutomationContext } from '@/modules/automations/automationContext'
 import DesktopAutomationWorkbench from '@/modules/automations/layouts/DesktopAutomationWorkbench.vue'
 import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 
 const router = useRouter()
-const {
-  language,
-  automations,
-} = useAutomationContext()
+const { language } = useDesktopUi()
+const { automations } = useAutomationContext()
 </script>
 
 <template>

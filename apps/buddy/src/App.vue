@@ -55,10 +55,12 @@ watchEffect(() => {
     <NMessageProvider placement="top" closable :duration="6000">
       <div class="buddy-app" :class="{ 'is-dark': prefersDark }">
         <DesktopAppProvider
+          v-slot="{ shell }"
+          :is-dark="prefersDark"
           @language-change="language = $event"
           @theme-change="themePreference = $event"
         >
-          <DesktopShell />
+          <DesktopShell :bindings="shell" />
         </DesktopAppProvider>
       </div>
     </NMessageProvider>

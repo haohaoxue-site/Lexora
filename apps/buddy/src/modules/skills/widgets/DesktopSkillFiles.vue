@@ -3,6 +3,7 @@ import type { LocalSkill } from '@buddy-shared/skills/skillApi'
 import { NSpin } from 'naive-ui'
 import { computed, shallowRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 import DesktopContextFileTree from '@/shared/ui/files/DesktopContextFileTree.vue'
 import DesktopContextSplit from '@/shared/ui/files/DesktopContextSplit.vue'
 import DesktopFileToolbar from '@/shared/ui/files/DesktopFileToolbar.vue'
@@ -12,7 +13,7 @@ import { useSkillFilePreview } from '../state/useSkillFilePreview'
 
 const props = defineProps<{ skill: LocalSkill, spaceId: string | null }>()
 const context = useSkillsContext()
-const { language } = context
+const { language } = useDesktopUi()
 const { t } = useBuddyI18n(language)
 const target = computed(() => ({ spaceId: props.spaceId, skill: props.skill }))
 const { nodes, expandedKeys, path, preview, loading, failed, treeFailed, open, load } = useSkillFilePreview(context.api, target)
