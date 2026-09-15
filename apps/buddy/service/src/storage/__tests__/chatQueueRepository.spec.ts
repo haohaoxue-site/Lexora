@@ -6,6 +6,7 @@ import { createAttachmentRepository } from '../attachmentRepository'
 import { createChatQueueRepository } from '../chatQueueRepository'
 import { createComposerDraftRepository } from '../composerDraftRepository'
 import { openBuddyDatabase } from '../database'
+import { createRunInputRepository } from '../runInputRepository'
 import { createTurnRequestRepository } from '../turnRequestRepository'
 
 const databases: DatabaseSync[] = []
@@ -53,8 +54,8 @@ describe('chat queue ownership and delivery', () => {
     expect(f.queue.cancel(f.target('B'))).toBe(true)
     expect(f.queue.cancel(f.target('B'))).toBe(false)
     const c = f.queue.pending(f.target('C'))!
-    f.queue.commitSteering(c, 'run-initial')
-    expect(() => f.queue.commitSteering(c, 'run-initial')).toThrow()
+    f.queue.commitInRun(c, 'run-initial')
+    expect(() => f.queue.commitInRun(c, 'run-initial')).toThrow()
     expect(f.queue.list(f.scope).map(item => item.id)).toEqual(['A'])
     expect(f.database.prepare('SELECT id FROM messages ORDER BY rowid').all()).toEqual([{ id: 'initial' }, { id: 'C' }])
     expect(f.database.prepare('SELECT id FROM runs').all()).toEqual([{ id: 'run-initial' }])
@@ -79,7 +80,12 @@ describe('chat queue ownership and delivery', () => {
     expect(attachments.listDraftsBefore('2026-01-01T00:00:00.000Z')).toEqual([])
     f.queue.pause()
     expect(f.queue.list(f.scope)[0]).toMatchObject({ state: 'paused', attachments: [{ id: 'image', name: 'image.png' }] })
-    f.queue.commitSteering(f.queue.pending(f.target('C'))!, 'run-initial')
+    const runInputs = createRunInputRepository(f.database)
+    expect(runInputs.findByMessageId('C')).toBeNull()
+    f.queue.commitInRun(f.queue.pending(f.target('C'))!, 'run-initial')
+    expect(runInputs.findByMessageId('C')).toMatchObject({ runId: 'run-initial', attachmentIds: ['image'], prompt: 'C' })
+    expect(runInputs.findByTriggeringMessageId('C')).toBeNull()
+    expect(runInputs.findByMessageId('initial')).toEqual(runInputs.findByRunId('run-initial'))
     expect(attachments.findById('image')).toMatchObject({ conversationId: 'conversation', messageId: 'C', draftId: null, storedPath: '/test/snapshot.png' })
   })
 

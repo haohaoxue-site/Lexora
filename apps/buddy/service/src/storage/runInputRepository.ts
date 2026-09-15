@@ -38,6 +38,7 @@ interface RunInputRow {
 }
 
 export interface RunInputRepository {
+  findByMessageId: (messageId: string) => RunInputRecord | null
   findByRunId: (runId: string) => RunInputRecord | null
   findByTriggeringMessageId: (messageId: string) => RunInputRecord | null
 }
@@ -52,8 +53,20 @@ export function createRunInputRepository(database: DatabaseSync): RunInputReposi
     ORDER BY runs.started_at DESC, runs.id DESC
     LIMIT 1
   `)
+  const findQueuedInput = database.prepare(`
+    SELECT run_id, created_at,
+      json_extract(prepared_json, '$.runInput.attachmentIds') AS attachment_ids_json,
+      json_extract(prepared_json, '$.runInput.contextItems') AS context_items_json,
+      json_extract(prepared_json, '$.runInput.prompt') AS prompt,
+      json_extract(prepared_json, '$.runInput.reasoning') AS reasoning,
+      json_extract(prepared_json, '$.runInput.serviceTier') AS service_tier
+    FROM chat_queue WHERE id = ? AND state = 'sent' AND run_id IS NOT NULL
+  `)
 
   return {
+    findByMessageId(messageId) {
+      return toRecord(findByMessage.get(messageId) ?? findQueuedInput.get(messageId))
+    },
     findByRunId(runId) {
       return toRecord(findByRunId.get(runId))
     },

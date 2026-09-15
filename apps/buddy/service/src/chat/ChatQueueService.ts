@@ -3,8 +3,10 @@ import type { BuddyAgentRunner } from '../agent/execution/BuddyAgentRunner'
 import type { BuddyTurnLauncher } from '../agent/execution/BuddyTurnLauncher'
 import type { BuddyStartTurnInput } from '../BuddyRuntime'
 import type { ChatQueueRepository } from '../storage/chatQueueRepository'
+import type { RunInputRepository } from '../storage/runInputRepository'
+import type { RunRecord } from '../storage/runRecord'
 import type { RunRepository } from '../storage/runRepository'
-import type { TurnRequestRepository } from '../storage/turnRequestRepository'
+import type { PrepareTurnRequestInput, TurnRequestRepository } from '../storage/turnRequestRepository'
 import type { ChatTurnService } from './ChatTurnService'
 import { createHash } from 'node:crypto'
 import { isDocumentMimeType } from '../../../shared/conversation/attachmentFormats'
@@ -17,13 +19,14 @@ export interface ChatQueueServiceOptions {
   turns: Pick<ChatTurnService, 'prepareStart' | 'validatePreparedInput'>
   requests: Pick<TurnRequestRepository, 'prepare'>
   launcher: Pick<BuddyTurnLauncher, 'launch'>
-  runner: Pick<BuddyAgentRunner, 'steer'>
+  runner: Pick<BuddyAgentRunner, 'steer' | 'followUp'>
+  runInputs: Pick<RunInputRepository, 'findByRunId'>
   runs: Pick<RunRepository, 'findById'>
 }
 
 export class ChatQueueService {
   readonly #options: ChatQueueServiceOptions
-  readonly #draining = new Set<string>()
+  readonly #operations = new Map<string, Promise<void>>()
   #disposed = false
 
   constructor(options: ChatQueueServiceOptions) {
@@ -72,44 +75,85 @@ export class ChatQueueService {
     return cancelled
   }
 
-  async steer(target: LocalChatQueueTarget) {
-    if (this.#disposed || this.#draining.has(target.conversationId))
-      return false
-    const input = this.#options.queue.pending(target)
-    if (!input)
-      return false
+  steer(target: LocalChatQueueTarget) {
     const active = this.#options.queue.activeRun(target)
-    if (!active)
-      return this.#dispatch(target)
-    if (active.purpose !== 'chat' || active.model !== input.model || active.provider !== input.provider)
-      throw new BuddyServiceError('VALIDATION_FAILED')
-    this.#draining.add(target.conversationId)
-    try {
-      await this.#options.turns.validatePreparedInput(input, false)
-      if (this.#disposed)
+    return this.#serialize(target, async () => {
+      if (!active)
+        return this.#dispatch(target, true)
+      const input = this.#options.queue.pending(target)
+      if (!input || this.#options.queue.activeRun(target)?.id !== active.id)
         return false
-      return this.#options.runner.steer(active.id, () => {
-        const documents = input.attachmentBindings.flatMap(binding => isDocumentMimeType(binding.mimeType)
-          ? [{ attachmentId: binding.id, mimeType: binding.mimeType }]
-          : [])
-        const reference = createBuddyInputReference({
-          attachmentIds: [...input.runInput.attachmentIds],
-          resourceLabels: getAttachmentLabels(input.attachmentBindings, input.runInput.prompt),
-          ...(documents.length ? { documents } : {}),
-          messageId: input.userMessageId,
-          prompt: input.runInput.prompt,
-          images: input.attachmentBindings.flatMap((binding) => {
-            const metadata = binding.mimeType
-            return metadata?.startsWith('image/') && metadata !== 'image/svg+xml' ? [{ attachmentId: binding.id, mimeType: metadata }] : []
-          }),
-        })
-        this.#options.queue.commitSteering(input, active.id)
-        return reference
-      }, input.runInput.contextItems.flatMap(item => item.kind === 'skill' && item.skill ? [item.skill] : []))
+      if (active.purpose !== 'chat' || active.model !== input.model || active.provider !== input.provider)
+        throw new BuddyServiceError('VALIDATION_FAILED')
+      await this.#options.turns.validatePreparedInput(input, false)
+      if (this.#disposed || !this.#options.queue.pending(target) || this.#options.queue.activeRun(target)?.id !== active.id)
+        return false
+      return this.#deliver(input, active.id, 'steer')
+    })
+  }
+
+  async followUp(runId: string, signal: AbortSignal) {
+    const run = this.#options.runs.findById(runId)
+    if (!run || run.purpose !== 'chat')
+      return false
+    try {
+      return await this.#serialize(run, async () => {
+        if (signal.aborted || this.#options.queue.activeRun(run)?.id !== runId)
+          return false
+        const next = this.#options.queue.list(run)[0]
+        if (next?.state !== 'waiting')
+          return false
+        const input = this.#options.queue.pending(next)
+        if (!input || !this.#canFollowUp(run, input))
+          return false
+        await this.#options.turns.validatePreparedInput(input)
+        if (this.#disposed || signal.aborted)
+          return false
+        const head = this.#options.queue.list(run)[0]
+        if (this.#options.queue.activeRun(run)?.id !== runId
+          || head?.id !== next.id || head.state !== 'waiting'
+          || !this.#options.queue.pending(next)) {
+          return false
+        }
+        return this.#deliver(input, runId, 'followUp')
+      })
     }
-    finally {
-      this.#draining.delete(target.conversationId)
+    catch {
+      if (!this.#disposed)
+        this.#options.queue.pause(run.conversationId)
+      return false
     }
+  }
+
+  #canFollowUp(run: RunRecord, input: PrepareTurnRequestInput) {
+    const current = this.#options.runInputs.findByRunId(run.id)
+    return run.status === 'running' && run.branchId === input.branchId
+      && run.model === input.model && run.provider === input.provider
+      && run.approvalPolicy === input.approvalPolicy && run.executionProfile === input.executionProfile
+      && run.contextWindow === (input.modelParameters?.contextWindow ?? null)
+      && run.maxTokens === (input.modelParameters?.maxTokens ?? null)
+      && current?.reasoning === input.runInput.reasoning && current.serviceTier === input.runInput.serviceTier
+  }
+
+  #deliver(input: PrepareTurnRequestInput, runId: string, mode: 'steer' | 'followUp') {
+    return this.#options.runner[mode](runId, () => {
+      const documents = input.attachmentBindings.flatMap(binding => isDocumentMimeType(binding.mimeType)
+        ? [{ attachmentId: binding.id, mimeType: binding.mimeType }]
+        : [])
+      const reference = createBuddyInputReference({
+        attachmentIds: [...input.runInput.attachmentIds],
+        resourceLabels: getAttachmentLabels(input.attachmentBindings, input.runInput.prompt),
+        ...(documents.length ? { documents } : {}),
+        messageId: input.userMessageId,
+        prompt: input.runInput.prompt,
+        images: input.attachmentBindings.flatMap((binding) => {
+          const metadata = binding.mimeType
+          return metadata?.startsWith('image/') && metadata !== 'image/svg+xml' ? [{ attachmentId: binding.id, mimeType: metadata }] : []
+        }),
+      })
+      this.#options.queue.commitInRun(input, runId)
+      return reference
+    }, input.runInput.contextItems.flatMap(item => item.kind === 'skill' && item.skill ? [item.skill] : []))
   }
 
   onRunSettled(runId: string) {
@@ -134,35 +178,48 @@ export class ChatQueueService {
     }, 0)
   }
 
-  async #dispatchNext(scope: LocalChatQueueScope) {
-    if (this.#disposed || this.#options.queue.activeRun(scope))
-      return
-    const next = this.#options.queue.list(scope)[0]
-    if (next?.state === 'waiting')
-      await this.#dispatch(next)
+  #dispatchNext(scope: LocalChatQueueScope) {
+    return this.#serialize(scope, async () => {
+      if (this.#options.queue.activeRun(scope))
+        return false
+      const next = this.#options.queue.list(scope)[0]
+      return next?.state === 'waiting' ? this.#dispatch(next) : false
+    })
   }
 
-  async #dispatch(target: LocalChatQueueTarget) {
-    if (this.#disposed || this.#draining.has(target.conversationId) || this.#options.queue.activeRun(target))
+  async #dispatch(target: LocalChatQueueTarget, allowPaused = false) {
+    if (this.#disposed || this.#options.queue.activeRun(target))
       return false
     const input = this.#options.queue.pending(target)
     if (!input)
       return false
-    this.#draining.add(target.conversationId)
+    await this.#options.turns.validatePreparedInput(input)
+    if (this.#disposed || !this.#options.queue.pending(target) || this.#options.queue.activeRun(target))
+      return false
+    const head = this.#options.queue.list(target)[0]
+    if (!allowPaused && (head?.id !== target.id || head.state !== 'waiting'))
+      return false
+    const prepared = this.#options.requests.prepare({ ...input, createdAt: new Date().toISOString() })
+    const turn = await this.#options.launcher.launch(prepared.runId)
+    void turn.completion.then(() => this.onRunSettled(turn.runId), () => {
+      if (!this.#disposed)
+        this.#options.queue.pause(target.conversationId)
+    })
+    return true
+  }
+
+  async #serialize(scope: LocalChatQueueScope, operation: () => Promise<boolean>): Promise<boolean> {
+    const previous = this.#operations.get(scope.conversationId)
+    const { promise, resolve } = Promise.withResolvers<void>()
+    this.#operations.set(scope.conversationId, promise)
+    await previous
     try {
-      await this.#options.turns.validatePreparedInput(input)
-      if (this.#disposed)
-        return false
-      const prepared = this.#options.requests.prepare({ ...input, createdAt: new Date().toISOString() })
-      const turn = await this.#options.launcher.launch(prepared.runId)
-      void turn.completion.then(() => this.onRunSettled(turn.runId), () => {
-        if (!this.#disposed)
-          this.#options.queue.pause(target.conversationId)
-      })
-      return true
+      return this.#disposed ? false : await operation()
     }
     finally {
-      this.#draining.delete(target.conversationId)
+      if (this.#operations.get(scope.conversationId) === promise)
+        this.#operations.delete(scope.conversationId)
+      resolve()
     }
   }
 }

@@ -57,8 +57,23 @@ export function createReusableBuddySession(
   const convertToLlm = session.agent.convertToLlm
   const streamFunction = session.agent.streamFunction
   let latestContext: Context | null = null
-  const pendingSteering = new Map<string, BuddyInputReferenceV1>()
+  const pendingInputs = new Map<string, BuddyInputReferenceV1>()
   const requestInputs = new WeakMap<Context['messages'], { failed: boolean, documents: Map<string, AttachmentFileInput> }>()
+  function enqueueInput(mode: 'steer' | 'followUp', prepare: () => BuddyInputReferenceV1, skills: readonly SkillReference[] = []) {
+    if (!session.isStreaming || options.runContext.current?.signal.aborted)
+      return false
+    for (const skill of skills) {
+      if (!options.skillReferences?.some(active => active.id === skill.id && active.name === skill.name && active.revision === skill.revision)) {
+        if (mode === 'followUp')
+          return false
+        throw new SkillError('SKILL_CHANGED')
+      }
+    }
+    const input = prepare()
+    pendingInputs.set(input.messageId, input)
+    session.agent[mode](createBuddyInputReferenceMessage(input, Date.now()))
+    return true
+  }
   session.agent.convertToLlm = async (messages) => {
     const request = { failed: false, documents: new Map<string, AttachmentFileInput>() }
     const materialized = []
@@ -145,26 +160,17 @@ export function createReusableBuddySession(
       for (const message of messages) {
         const input = readBuddyInputReference(message)
         if (input)
-          pendingSteering.delete(input.messageId)
+          pendingInputs.delete(input.messageId)
       }
-      messages.push(...[...pendingSteering.values()].map(input => createBuddyInputReferenceMessage(input, Date.now())))
+      messages.push(...[...pendingInputs.values()].map(input => createBuddyInputReferenceMessage(input, Date.now())))
       return { messages, systemPrompt: session.systemPrompt }
     },
-    steer: (prepare, skills = []) => {
-      if (!session.isStreaming)
-        return false
-      for (const skill of skills) {
-        if (!options.skillReferences?.some(active => active.id === skill.id && active.name === skill.name && active.revision === skill.revision))
-          throw new SkillError('SKILL_CHANGED')
-      }
-      const input = prepare()
-      pendingSteering.set(input.messageId, input)
-      session.agent.steer(createBuddyInputReferenceMessage(input, Date.now()))
-      return true
-    },
+    steer: (prepare, skills) => enqueueInput('steer', prepare, skills),
+    followUp: (prepare, skills) => enqueueInput('followUp', prepare, skills),
     abort: () => {
-      pendingSteering.clear()
+      pendingInputs.clear()
       session.agent.clearSteeringQueue()
+      session.agent.clearFollowUpQueue()
       return session.abort()
     },
     abortCompaction: () => session.abortCompaction(),
@@ -229,8 +235,9 @@ export function createReusableBuddySession(
           }
           finally {
             await session.waitForIdle()
-            pendingSteering.clear()
+            pendingInputs.clear()
             session.agent.clearSteeringQueue()
+            session.agent.clearFollowUpQueue()
             options.tree?.finish()
           }
         },

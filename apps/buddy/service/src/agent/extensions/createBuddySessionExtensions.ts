@@ -18,11 +18,13 @@ import { SandboxDirectoryPermissions } from '../../sandbox/SandboxDirectoryPermi
 import { createShellCapability } from '../../sandbox/shellCapability'
 import { resolveShellExecution } from '../../sandbox/shellExecution'
 import { createChangeCaptureExtension } from './changeCaptureExtension'
+import { createChatQueueExtension } from './chatQueueExtension'
 import { createToolDiscoveryCapability } from './discovery/toolDiscoveryExtension'
 import { createInputReferenceExtension } from './inputReferenceExtension'
 import { createToolPolicyExtension } from './toolPolicyExtension'
 
 export interface BuddySessionExtensionServices {
+  followUp?: (runId: string, signal: AbortSignal) => Promise<void>
   prepareForRun?: (signal: AbortSignal) => Promise<void>
   approvalService: Pick<ApprovalService, 'request'>
   attachmentService: Pick<AttachmentService, 'materializePiInputImages' | 'materializeDocumentInputs' | 'materializeInputResources' | 'getInputMetadata'>
@@ -103,6 +105,9 @@ export async function createBuddySessionExtensions(
   const sessionCapabilities = [...capabilities, discovery]
   const inProcessExtensions: BuddyInProcessExtension[] = [
     createInputReferenceExtension(inputReferences),
+    ...options.sessionMode === 'interactive' && services.followUp
+      ? [createChatQueueExtension({ getRunContext: () => runContext.current, followUp: services.followUp })]
+      : [],
     ...sessionCapabilities.map(capability => capability.extension),
     createToolPolicyExtension({
       authorization,
