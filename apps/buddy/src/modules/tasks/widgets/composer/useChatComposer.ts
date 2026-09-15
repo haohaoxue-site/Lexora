@@ -3,11 +3,13 @@ import type { BuddyComposerSource } from '@buddy-shared/conversation/composerRes
 import type { ComposerResourceCard, UseChatComposerOptions } from './typing'
 import type { ChatPromptContextOption } from '@/modules/prompt-input'
 import { parseBuddyChatCommand } from '@buddy-shared/conversation/buddyChatCommands'
+import { composerReferencePath } from '@buddy-shared/conversation/composerReferencePath'
 import { computed, onScopeDispose, watch } from 'vue'
 import { CHAT_PROMPT_DIRECTIVE_NODE_NAME, getChatComposerResourceIds, serializeChatComposerContent } from '@/modules/prompt-input'
 import { insertChatComposerResources, insertResolvedChatComposerResource, removeChatComposerPanelResource, removeChatComposerResource } from '@/modules/prompt-input/ui'
 import { resolveComposerResourcePreviewUrl } from '../../model/attachments/chatAttachmentView'
 import { resolveChatComposerModelInputIssue } from '../../model/composer/chatComposerModelCapability'
+import { composerParentDirectory } from './chatComposerSourcePresentation'
 import { addChatQuote, removeChatQuote } from './chatQuoteEditing'
 import { useChatComposerEditor } from './useChatComposerEditor'
 import { useChatComposerSuggestions } from './useChatComposerSuggestions'
@@ -22,7 +24,7 @@ export function useChatComposer(options: UseChatComposerOptions) {
   })
 
   const resourceById = computed(() => new Map(options.resources.value.map(entry => [entry.resource.resourceId, entry])))
-  const query = useChatComposerSuggestions(options, selectSuggestion)
+  const query = useChatComposerSuggestions(options, selectSuggestion, getImageLabel)
   const { editor, contentJSON, imageLabels, serializedContent } = useChatComposerEditor({
     composerContent: options.composerContent,
     draft: options.draft,
@@ -33,7 +35,18 @@ export function useChatComposer(options: UseChatComposerOptions) {
     resources: options.resources,
     onUpdateContent: options.onUpdateContent,
     onTrigger: (trigger) => { query.activeTrigger.value = trigger },
-    onSuggestionKeydown: query.handleKeydown,
+    onSuggestionKeydown: (event) => {
+      const directory = query.contextOptions.value.directory
+      if (!event.isComposing && event.keyCode !== 229 && event.key === 'Tab' && event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey && query.activeTrigger.value?.kind === 'mention' && directory) {
+        const parent = composerParentDirectory(directory)
+        if (parent) {
+          event.preventDefault()
+          navigateDirectory(parent)
+          return true
+        }
+      }
+      return query.handleKeydown(event)
+    },
     onPasteFiles: files => attachFiles(files, 'both', 'clipboard'),
     onSubmit: submit,
     onLocateResource: options.onLocateResource,
@@ -67,6 +80,10 @@ export function useChatComposer(options: UseChatComposerOptions) {
     })
   })
 
+  function getImageLabel(resourceId: string): string | undefined {
+    return imageLabels.value.get(resourceId)
+  }
+
   function submit() {
     if (!canSubmit.value)
       return
@@ -77,6 +94,14 @@ export function useChatComposer(options: UseChatComposerOptions) {
     const session = editingSession
     const resourceId = await options.selectSource(source)
     return session === editingSession ? resourceId : null
+  }
+
+  function resolveOption(option: ChatPromptContextOption): Promise<string | null> {
+    if (option.resourceId) {
+      const resource = resourceById.value.get(option.resourceId)?.resource
+      return Promise.resolve(resource?.draftId === options.draftId.value && resource.state === 'ready' && resourceIds.value.includes(resource.resourceId) ? resource.resourceId : null)
+    }
+    return option.source ? resolveSource(option.source) : Promise.resolve(null)
   }
 
   function attachFiles(files: readonly File[], placement: 'panel' | 'both', origin: 'file' | 'clipboard' = 'file') {
@@ -93,18 +118,27 @@ export function useChatComposer(options: UseChatComposerOptions) {
     return removeChatComposerResource(current, resourceId)
   }
 
-  function selectSuggestion(option: ChatPromptContextOption | undefined) {
+  function selectSuggestion(option: ChatPromptContextOption | undefined, action: 'complete' | 'select' = 'select') {
     const currentEditor = editor.value
     const trigger = query.activeTrigger.value
     if (!currentEditor || !currentEditor.isEditable || !trigger || !option)
       return
 
     const to = currentEditor.state.selection.from
-    const from = Math.max(1, to - trigger.query.length - 1)
+    const from = Math.max(1, to - (trigger.rawQuery ?? trigger.query).length - 1)
+    if (action === 'complete' && option.entryKind === 'directory' && option.path) {
+      navigateDirectory(option.path)
+      return
+    }
+    if (action === 'complete' && option.kind === 'file' && option.path) {
+      const path = composerReferencePath(option.path, query.contextOptions.value.directory?.workingDirectory)
+      const text = /[\s"\\]/u.test(path) ? `@${JSON.stringify(path)}` : `@${path}`
+      currentEditor.chain().focus().insertContentAt({ from, to }, { type: 'text', text }).run()
+      return
+    }
     query.activeTrigger.value = null
     if (option.kind === 'file') {
-      if (option.source)
-        void insertResolvedChatComposerResource(currentEditor, { from, to }, () => resolveSource(option.source!))
+      void insertResolvedChatComposerResource(currentEditor, { from, to }, () => resolveOption(option))
       return
     }
     const command = option.kind === 'slashCommand' ? parseBuddyChatCommand(option.value) : null
@@ -124,11 +158,24 @@ export function useChatComposer(options: UseChatComposerOptions) {
       .run()
   }
 
+  function navigateDirectory(path: string) {
+    const currentEditor = editor.value
+    const trigger = query.activeTrigger.value
+    if (!currentEditor || !trigger || trigger.kind !== 'mention')
+      return
+    const reference = composerReferencePath(path, query.contextOptions.value.directory?.workingDirectory)
+    const completion = reference === '.' ? '' : `${reference.replace(/[\\/]+$/u, '')}/`
+    const text = /[\s"\\]/u.test(completion) ? `@${JSON.stringify(completion).slice(0, -1)}` : `@${completion}`
+    const to = currentEditor.state.selection.from
+    const from = Math.max(1, to - (trigger.rawQuery ?? trigger.query).length - 1)
+    currentEditor.chain().focus().insertContentAt({ from, to }, { type: 'text', text }).run()
+  }
+
   async function selectPanelSource(option: ChatPromptContextOption): Promise<boolean> {
     const currentEditor = editor.value
-    if (!currentEditor || !currentEditor.isEditable || option.kind !== 'file' || !option.source)
+    if (!currentEditor || !currentEditor.isEditable || option.kind !== 'file')
       return false
-    const resourceId = await resolveSource(option.source)
+    const resourceId = await resolveOption(option)
     if (!resourceId)
       return false
     return insertChatComposerResources(currentEditor, [resourceId], 'panel')
@@ -143,7 +190,11 @@ export function useChatComposer(options: UseChatComposerOptions) {
     contextOptions: query.contextOptions,
     editor,
     isLoadingContext: query.isLoadingContext,
+    contextLoadFailed: query.contextLoadFailed,
     loadContextOptions: query.loadContextOptions,
+    deepSearch: query.deepSearch,
+    setDeepSearch: query.setDeepSearch,
+    navigateDirectory,
     modelInputIssue,
     panelResources,
     quotes,

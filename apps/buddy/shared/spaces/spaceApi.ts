@@ -38,6 +38,7 @@ export const spaceSchema = z.object({
 
 export const spaceFileSchema = z.object({
   directoryId: idSchema,
+  kind: z.enum(['file', 'directory']).optional(),
   name: z.string().min(1),
   path: z.string().min(1),
   relativePath: z.string().min(1),
@@ -67,6 +68,7 @@ export const spacesRequestSchemas = {
   spaceFileSearch: z.object({
     spaceId: idSchema,
     query: z.string().max(512),
+    deepSearch: z.boolean().optional(),
   }).strict(),
   spaceCreate: z.object({
     icon: spaceIconSchema.optional(),

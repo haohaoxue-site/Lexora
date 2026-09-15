@@ -101,7 +101,7 @@ export interface TaskComposer {
   permissionMode: State<BuddyPermissionMode>
   beginImport: (files: readonly File[], origin?: 'file' | 'clipboard') => readonly string[]
   dismissInteraction: (id: string) => void
-  listContextOptions: (fileQuery: string | null) => Promise<ChatComposerContextOptions>
+  listContextOptions: (fileQuery: string | null, deepSearch?: boolean) => Promise<ChatComposerContextOptions>
   retryResource: (resourceId: string) => Promise<void>
   selectAttachments: () => Promise<void>
   selectModel: (modelId: string) => Promise<void>

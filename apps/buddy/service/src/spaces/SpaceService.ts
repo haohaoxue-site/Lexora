@@ -9,14 +9,11 @@ import type {
   SpaceRepository,
 } from '../storage/spaceRepository'
 import { randomUUID } from 'node:crypto'
-import { mkdir, readdir, realpath, stat } from 'node:fs/promises'
-import { join, relative, resolve, sep } from 'node:path'
-import { resolveGrantedPath } from '../directories/resolveGrantedPath'
+import { mkdir, realpath, stat } from 'node:fs/promises'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { containsCanonicalPath } from '../../../platform/filesystem/filePaths'
+import { parseDirectorySearch, searchDirectoryEntries } from '../directories/searchDirectoryEntries'
 import { requireActiveSpace } from './requireActiveSpace'
-
-const IGNORED_SEARCH_DIRECTORIES = new Set(['.git', 'dist', 'node_modules', 'out', 'target'])
-const MAX_SEARCHED_ENTRIES = 5_000
-const MAX_SEARCH_RESULTS = 50
 
 export interface SpaceAdditionalDirectoryInput {
   id: string | null
@@ -27,6 +24,7 @@ export type SpacePrimaryDirectoryInput = SpaceAdditionalDirectoryInput
 
 export interface SpaceFileSearchResult {
   directoryId: string
+  kind?: 'file' | 'directory'
   name: string
   path: string
   relativePath: string
@@ -248,57 +246,19 @@ export class SpaceService {
     return this.#spaces.list()
   }
 
-  async searchFiles(spaceId: string, query: string): Promise<SpaceFileSearchResult[]> {
+  async searchFiles(spaceId: string, query: string, deepSearch = false): Promise<SpaceFileSearchResult[]> {
     const space = requireActiveSpace(this.#spaces.findById(spaceId))
-    const normalizedQuery = query.trim().toLocaleLowerCase()
-    const results: SpaceFileSearchResult[] = []
-    const directories = getSpaceDirectories(space)
-    const grants = directories.map(directory => ({
-      canonicalRoot: directory.canonicalRoot,
-      grantId: directory.id,
-      kind: 'workspace' as const,
-      root: directory.root,
-    }))
-    const pending = directories.map(directory => ({
-      directory,
-      path: directory.canonicalRoot,
-    }))
-    let searched = 0
-    while (pending.length > 0 && searched < MAX_SEARCHED_ENTRIES && results.length < MAX_SEARCH_RESULTS) {
-      const current = pending.shift()
-      if (!current)
-        break
-      const entries = await readdir(current.path, { withFileTypes: true }).catch(() => [])
-      for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
-        searched += 1
-        if (searched > MAX_SEARCHED_ENTRIES)
-          break
-        const candidate = join(current.path, entry.name)
-        if (entry.isDirectory() && !IGNORED_SEARCH_DIRECTORIES.has(entry.name)) {
-          pending.push({ directory: current.directory, path: candidate })
-          continue
-        }
-        if (!entry.isFile())
-          continue
-        const relativePath = relative(current.directory.canonicalRoot, candidate)
-        if (normalizedQuery && !relativePath.toLocaleLowerCase().includes(normalizedQuery))
-          continue
-        try {
-          const resolution = await resolveGrantedPath(grants, candidate, 'existing')
-          results.push({
-            directoryId: current.directory.id,
-            name: entry.name,
-            path: resolution.canonicalPath,
-            relativePath,
-            root: current.directory.root,
-          })
-        }
-        catch {}
-        if (results.length >= MAX_SEARCH_RESULTS)
-          break
-      }
-    }
-    return results
+    const primary = space.primaryDirectory
+    if (!primary && !isAbsolute(query))
+      return []
+    const parsed = parseDirectorySearch(query, primary?.canonicalRoot ?? query)
+    const directory = getSpaceDirectories(space)
+      .filter(directory => !directory.revokedAt && containsCanonicalPath(directory.canonicalRoot, parsed.path))
+      .sort((left, right) => right.canonicalRoot.length - left.canonicalRoot.length)[0]
+    if (!directory)
+      return []
+    const result = await searchDirectoryEntries({ canonicalRoot: directory.canonicalRoot, grantId: directory.id, kind: 'workspace', root: directory.root }, parsed.path, parsed.term, deepSearch)
+    return result.entries.map(entry => ({ ...entry, directoryId: directory.id, relativePath: relative(directory.canonicalRoot, entry.path), root: directory.root }))
   }
 
   async #resolveDirectoryConfiguration(

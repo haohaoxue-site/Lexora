@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { DatabaseSync as NodeDatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { createComposerResourceRepository } from '../composerResourceRepository'
 import { openBuddyDatabase } from '../database'
 import { BUDDY_V15_CAPABILITY_OVERRIDES_SCHEMA_SQL, BUDDY_V15_CATALOG_MODEL_ID_SCHEMA_SQL, BUDDY_V15_CATALOG_SELECTION_SCHEMA_SQL, BUDDY_V15_MODEL_SERVICES_SCHEMA_SQL, BUDDY_V15_PROVIDER_INSTANCES_SCHEMA_SQL, BUDDY_V15_REQUEST_HEADERS_SCHEMA_SQL } from '../migrations/v15ModelServices'
 import { BUDDY_SCHEMA_MIGRATIONS, BUDDY_SCHEMA_VERSION } from '../schema'
@@ -75,6 +76,28 @@ function seedRun(
 }
 
 describe('buddy schema', () => {
+  it('upgrades v18 without rewriting legacy sources and permits independent local reference identities', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'buddy-local-reference-migration-'))
+    directories.push(directory)
+    const databasePath = join(directory, 'buddy.sqlite3')
+    const previous = new NodeDatabaseSync(databasePath)
+    for (const migration of BUDDY_SCHEMA_MIGRATIONS.filter(migration => migration.version <= 18))
+      previous.exec(migration.sql)
+    previous.exec('PRAGMA user_version = 18')
+    const metadata = { resourceId: 'legacy', name: 'note.txt', mimeType: 'text/plain', sizeBytes: 3 }
+    const source = { spaceId: 'space', bindingId: 'binding', bindingRevision: 1, relativePath: 'note.txt' }
+    const old = createComposerResourceRepository(previous).selectSource('draft', metadata, source, '2026-09-15T00:00:00.000Z')
+    previous.close()
+    const upgraded = openBuddyDatabase({ databasePath })
+    databases.push(upgraded)
+    const repository = createComposerResourceRepository(upgraded)
+    expect(repository.findById('legacy')).toEqual(old)
+    const localReference = { kind: 'file' as const, path: '/workspace/note.txt', name: 'note.txt', mimeType: 'text/plain', sizeBytes: 3 }
+    repository.acceptBatch('draft', ['one', 'two'].map(resourceId => ({ metadata: { ...metadata, resourceId }, source: { localReference } })), '2026-09-15T00:00:00.000Z')
+    expect(repository.listForDraft('draft').map(resource => resource.resourceId)).toEqual(['legacy', 'one', 'two'])
+    expect(upgraded.prepare('PRAGMA user_version').get()).toEqual({ user_version: BUDDY_SCHEMA_VERSION })
+    expect(upgraded.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+  })
   it('upgrades v16 to skills storage without changing conversations or run history', () => {
     const directory = mkdtempSync(join(tmpdir(), 'buddy-skills-migration-'))
     directories.push(directory)

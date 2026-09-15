@@ -243,8 +243,8 @@ export async function startBuddyService(
       conversations,
       drafts: composerDrafts,
       eventLog: options.eventLog,
+      paths,
       repository: createComposerResourceRepository(options.database),
-      spaceFiles: spaceService,
       spaces: spacesRepository,
     })
     await host.step('runtime.attachments', async () => {

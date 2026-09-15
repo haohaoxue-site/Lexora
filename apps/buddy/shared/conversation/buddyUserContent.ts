@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { skillReferenceSchema } from '../skills/skillApi'
+import { buddyLocalResourceSchema } from './localResource'
 
 export const buddyResourceIdSchema = z.string().regex(/^[A-Z0-9][\w-]{0,127}$/i)
 
@@ -70,9 +71,24 @@ export type BuddyInlineNodeV1 = z.infer<typeof buddyInlineNodeV1Schema>
 export type BuddyPromptDirective = z.infer<typeof buddyPromptDirectiveSchema>
 
 export const buddyUserMessageResourceSnapshotSchema = z.object({
-  attachmentId: buddyResourceIdSchema,
+  attachmentId: buddyResourceIdSchema.optional(),
+  localReference: buddyLocalResourceSchema.optional(),
   resourceId: buddyResourceIdSchema,
-}).strict().readonly()
+}).strict().refine(value => value.attachmentId !== undefined || value.localReference !== undefined).readonly()
+
+export function getResourceAttachmentIds(resources: readonly BuddyUserMessageResourceSnapshot[]): string[] {
+  return resources.flatMap(resource => resource.attachmentId ? [resource.attachmentId] : [])
+}
+
+export function bindResourceAttachments(resources: readonly BuddyUserMessageResourceSnapshot[], attachmentIds: readonly string[]): BuddyUserMessageResourceSnapshot[] {
+  let index = 0
+  const bound = resources.map(resource => resource.attachmentId
+    ? { ...resource, attachmentId: attachmentIds[index++] }
+    : resource)
+  if (index !== attachmentIds.length || bound.some(resource => resource.attachmentId === undefined && !resource.localReference))
+    throw new Error('Resource attachment bindings do not match')
+  return bound
+}
 
 export const buddyUserMessageContentV1Schema = z.object({
   resourceSnapshots: z.array(buddyUserMessageResourceSnapshotSchema).readonly(),

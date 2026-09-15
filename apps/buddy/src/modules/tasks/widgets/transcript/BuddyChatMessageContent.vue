@@ -9,7 +9,7 @@ import { NScrollbar, NTooltip } from 'naive-ui'
 import { computed, nextTick, shallowRef, useTemplateRef } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { formatFileSize } from '@/shared/lib/formatFileSize'
-import { FileIcon } from '@/shared/ui/file-icon'
+import { FileIcon, FolderIcon } from '@/shared/ui/file-icon'
 import BuddyChatMarkdownContent from '@/shared/ui/markdown/DesktopMarkdownContent.vue'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
 import { resolveBuddyAttachmentPreviewUrl } from '../../model/attachments/chatAttachmentView'
@@ -46,6 +46,7 @@ const structuredUserContent = computed(() => getChatMessageUserContent(props.mes
 const imageLabels = computed(() => getChatMessageImageLabels(props.message))
 const allAttachmentViews = computed(() => props.message.attachments.map(attachment => ({
   attachment,
+  attachmentId: attachment.attachmentId,
   previewUrl: resolveBuddyAttachmentPreviewUrl(attachment),
   resourceId: attachment.attachmentId,
 })))
@@ -54,7 +55,7 @@ const attachmentByResourceId = computed(() => {
     props.message.attachments.map(attachment => [attachment.attachmentId, attachment]),
   )
   return new Map(structuredUserContent.value?.resourceSnapshots.flatMap((snapshot) => {
-    const attachment = attachmentsById.get(snapshot.attachmentId)
+    const attachment = attachmentsById.get(snapshot.attachmentId ?? '') ?? snapshot.localReference
     return attachment ? [[snapshot.resourceId, attachment] as const] : []
   }) ?? [])
 })
@@ -65,7 +66,7 @@ const attachmentViews = computed(() => {
   return getBuddyUserContentResourceIds(structured.userContent).flatMap((resourceId) => {
     const attachment = attachmentByResourceId.value.get(resourceId)
     return attachment
-      ? [{ attachment, previewUrl: resolveBuddyAttachmentPreviewUrl(attachment), resourceId }]
+      ? [{ attachment, attachmentId: 'attachmentId' in attachment ? attachment.attachmentId : undefined, previewUrl: 'attachmentId' in attachment ? resolveBuddyAttachmentPreviewUrl(attachment) : null, resourceId }]
       : []
   })
 })
@@ -80,7 +81,9 @@ function markPreviewFailed(attachmentId: string) {
   failedAttachmentIds.value = new Set([...failedAttachmentIds.value, attachmentId])
 }
 
-function openPreview(attachmentId: string) {
+function openPreview(attachmentId: string | undefined) {
+  if (!attachmentId)
+    return
   const index = previewableAttachmentViews.value.findIndex(
     view => view.attachment.attachmentId === attachmentId,
   )
@@ -137,19 +140,19 @@ function previewLeaveTransition(): Promise<void> {
       >
         <figure
           v-for="view in attachmentViews"
-          :id="`buddy-attachment-${view.attachment.attachmentId}`"
+          :id="`buddy-resource-${view.resourceId}`"
           :key="view.resourceId"
           class="buddy-chat-message-content__attachment"
           :class="{ 'is-highlighted': highlightedResourceId === view.resourceId }"
           :data-resource-card="view.resourceId"
-          @click="openPreview(view.attachment.attachmentId)"
+          @click="openPreview(view.attachmentId)"
         >
           <button
-            v-if="view.previewUrl && !failedAttachmentIds.has(view.attachment.attachmentId)"
+            v-if="view.previewUrl && view.attachmentId && !failedAttachmentIds.has(view.attachmentId)"
             class="buddy-chat-message-content__preview-trigger"
             type="button"
             :aria-label="t('desktop.imagePreview.open', { name: view.attachment.name })"
-            @click.stop="openPreview(view.attachment.attachmentId)"
+            @click.stop="openPreview(view.attachmentId)"
           >
             <img
               :src="view.previewUrl"
@@ -157,11 +160,12 @@ function previewLeaveTransition(): Promise<void> {
               height="112"
               loading="lazy"
               width="160"
-              @error="markPreviewFailed(view.attachment.attachmentId)"
+              @error="markPreviewFailed(view.attachmentId)"
             >
           </button>
           <div v-else class="buddy-chat-message-content__file">
-            <FileIcon :name="view.attachment.name" size="preview" />
+            <FolderIcon v-if="view.attachment.kind === 'directory'" class="buddy-chat-message-content__folder" />
+            <FileIcon v-else :name="view.attachment.name" size="preview" />
           </div>
           <figcaption class="buddy-chat-message-content__attachment-details">
             <NTooltip :delay="300" :style="{ maxWidth: '24rem', overflowWrap: 'anywhere' }">
@@ -170,9 +174,9 @@ function previewLeaveTransition(): Promise<void> {
                   {{ imageLabels.get(view.resourceId) ?? view.attachment.name }}
                 </span>
               </template>
-              {{ view.attachment.name }}
+              {{ 'path' in view.attachment ? view.attachment.path : view.attachment.name }}
             </NTooltip>
-            <span class="buddy-chat-message-content__attachment-size">{{ formatFileSize(view.attachment.sizeBytes) }}</span>
+            <span v-if="view.attachment.kind !== 'directory'" class="buddy-chat-message-content__attachment-size">{{ formatFileSize(view.attachment.sizeBytes) }}</span>
           </figcaption>
         </figure>
       </div>
@@ -222,6 +226,7 @@ function previewLeaveTransition(): Promise<void> {
 
 <style scoped lang="scss">
 .buddy-chat-message-content {
+  &__folder { width: 3rem; height: 3rem; }
   display: grid;
   width: fit-content;
   max-width: min(42rem, 92%);

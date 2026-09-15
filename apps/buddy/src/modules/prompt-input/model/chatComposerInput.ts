@@ -2,7 +2,7 @@ import type { BuddyChatCommandDescriptionKey } from '@buddy-shared/conversation/
 
 import type { BuddyUserContentV1 } from '@buddy-shared/conversation/buddyUserContent'
 import type { LocalPromptContextItem } from '@buddy-shared/conversation/chatApi'
-import type { BuddyComposerSource } from '@buddy-shared/conversation/composerResource'
+import type { BuddyComposerDirectory, BuddyComposerSource } from '@buddy-shared/conversation/composerResource'
 import type { JSONContent } from '@tiptap/core'
 import { BUDDY_CHAT_COMMANDS } from '@buddy-shared/conversation/buddyChatCommands'
 import { buddyUserContentToText } from '@buddy-shared/conversation/buddyUserContent'
@@ -10,13 +10,24 @@ import { chatComposerDocumentToUserContent } from './chatComposerDocument'
 
 export interface ChatPromptContextOption extends LocalPromptContextItem {
   description: string | null
-  category?: 'artifact' | 'history' | 'space'
+  category?: 'artifact' | 'current' | 'history' | 'space' | 'external'
+  resourceId?: string
+  entryKind?: 'file' | 'directory'
+  fileName?: string
+  fileMetadata?: {
+    mimeType: string
+    sizeBytes: number
+    nameSource?: 'file' | 'clipboard'
+    createdAt?: string | null
+    messageNumber?: number
+  }
   label: string
   path: string | null
   source?: BuddyComposerSource
 }
 
 export interface ChatComposerContextOptions {
+  directory?: BuddyComposerDirectory
   files: ReadonlyArray<ChatPromptContextOption>
   skills: ReadonlyArray<ChatPromptContextOption>
 }
@@ -32,6 +43,7 @@ export function createChatComposerSourceOptions(
 export interface ChatComposerTrigger {
   kind: 'slash' | 'skill' | 'mention'
   query: string
+  rawQuery?: string
 }
 
 export interface ChatComposerSubmitPayload {
@@ -73,9 +85,18 @@ export function findChatComposerTrigger(textBeforeCursor: string): ChatComposerT
     return null
 
   const query = textBeforeCursor.slice(triggerIndex + 1)
+  const trigger = textBeforeCursor[triggerIndex]
+  if (trigger === '@' && query.startsWith('"') && !/[\r\n]/u.test(query)) {
+    try {
+      const decoded = JSON.parse(query.endsWith('"') && query.length > 1 ? query : `${query}"`) as string
+      return { kind: 'mention', query: decoded, rawQuery: query }
+    }
+    catch {
+      return null
+    }
+  }
   if (/\s/u.test(query))
     return null
-  const trigger = textBeforeCursor[triggerIndex]
   return {
     kind: trigger === '/' ? 'slash' : trigger === '$' ? 'skill' : 'mention',
     query,
@@ -97,10 +118,9 @@ export function createChatComposerSuggestions(
         path: null,
         value: `/${command.name}`,
       }))
-    : trigger.kind === 'skill' ? options.skills : createChatComposerSourceOptions(options.files, trigger.query)
+    : trigger.kind === 'skill' ? options.skills : createChatComposerSourceOptions(options.files)
   const query = trigger.query.trim().toLowerCase()
-  return (trigger.kind === 'mention' ? candidates : filterChatComposerOptions(candidates, query))
-    .slice(0, 8)
+  return (trigger.kind === 'mention' ? candidates : filterChatComposerOptions(candidates, query).slice(0, 8))
     .map(option => ({ option }))
 }
 
@@ -127,7 +147,7 @@ function filterChatComposerOptions(
   query: string,
 ): ReadonlyArray<ChatPromptContextOption> {
   const normalizedQuery = query.trim().toLowerCase()
-  return options.filter(option => [option.label, option.value, option.path, option.description]
+  return options.filter(option => [option.label, option.fileName, option.value, option.path, option.description]
     .filter(Boolean)
     .join(' ')
     .toLowerCase()

@@ -5,6 +5,7 @@ import {
   BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
 } from './attachmentPolicy'
 import { buddyResourceIdSchema } from './buddyUserContent'
+import { buddyLocalResourceSchema, localResourcePathSchema } from './localResource'
 
 export const buddyComposerResourceMetadataSchema = z.object({
   mimeType: z.string().trim().max(255),
@@ -12,12 +13,13 @@ export const buddyComposerResourceMetadataSchema = z.object({
   nameSource: z.enum(['file', 'clipboard']).optional(),
   sourcePath: z.string().min(1).max(4096).refine(value => isAbsolutePath(value) && !value.includes('\0')).optional(),
   resourceId: buddyResourceIdSchema,
-  sizeBytes: z.number().int().nonnegative().max(BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT),
+  sizeBytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
 }).strict()
 
 const resourceBaseSchema = buddyComposerResourceMetadataSchema.extend({
   draftId: buddyResourceIdSchema,
-  kind: z.enum(['image', 'pdf', 'audio', 'video', 'text']),
+  kind: z.enum(['image', 'pdf', 'audio', 'video', 'text', 'binary', 'directory']),
+  localReference: buddyLocalResourceSchema.optional(),
 })
 
 export const buddySpaceFileSourceSchema = z.object({
@@ -39,6 +41,12 @@ export const buddyMessageInputSourceSchema = z.object({
 
 export const buddyMessageInputOriginSchema = buddyMessageInputSourceSchema
 
+export const buddyMessageResourceSourceSchema = buddyMessageInputSourceSchema.omit({ attachmentId: true }).extend({
+  resourceId: buddyResourceIdSchema,
+}).strict()
+
+export const buddyLocalPathSourceSchema = z.object({ localPath: localResourcePathSchema }).strict()
+
 export const buddyArtifactSourceSchema = z.object({
   artifactId: buddyResourceIdSchema,
   branchId: buddyResourceIdSchema,
@@ -47,10 +55,16 @@ export const buddyArtifactSourceSchema = z.object({
 
 export const buddyArtifactOriginSchema = buddyArtifactSourceSchema
 
+export const buddyLocalResourceOriginSchema = z.object({
+  localReference: buddyLocalResourceSchema,
+  origin: z.union([buddySpaceFileOriginSchema, buddyArtifactOriginSchema, buddyMessageResourceSourceSchema]).optional(),
+}).strict()
+
 export const buddyComposerSourceOriginSchema = z.union([
   buddySpaceFileOriginSchema,
   buddyMessageInputOriginSchema,
   buddyArtifactOriginSchema,
+  buddyLocalResourceOriginSchema,
 ])
 
 export const buddyComposerResourceSchema = z.union([
@@ -73,10 +87,13 @@ export const buddyComposerResourceSchema = z.union([
 
 export const buddyComposerResourceAcceptSchema = z.object({
   draftId: buddyResourceIdSchema,
-  resources: z.array(buddyComposerResourceMetadataSchema).min(1).max(BUDDY_ATTACHMENT_COUNT_LIMIT),
+  resources: z.array(buddyComposerResourceMetadataSchema.extend({
+    storage: z.enum(['reference', 'snapshot']).optional(),
+  }).strict()).min(1).max(BUDDY_ATTACHMENT_COUNT_LIMIT),
 }).strict().refine(
   value => new Set(value.resources.map(resource => resource.resourceId)).size === value.resources.length
-    && value.resources.reduce((total, resource) => total + resource.sizeBytes, 0) <= BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
+    && value.resources.every(resource => resource.storage !== 'reference' || resource.sourcePath !== undefined)
+    && value.resources.reduce((total, resource) => total + (resource.storage === 'reference' ? 0 : resource.sizeBytes), 0) <= BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT,
 )
 
 export const buddyComposerResourceTargetSchema = z.object({
@@ -92,6 +109,8 @@ export const buddyComposerSourceSchema = z.union([
   buddySpaceFileSourceSchema,
   buddyMessageInputSourceSchema,
   buddyArtifactSourceSchema,
+  buddyLocalPathSourceSchema,
+  buddyMessageResourceSourceSchema,
 ])
 
 export const buddyComposerSourceListSchema = z.object({
@@ -99,6 +118,7 @@ export const buddyComposerSourceListSchema = z.object({
   conversationId: buddyResourceIdSchema.nullable(),
   draftId: buddyResourceIdSchema,
   query: z.string().trim().max(512),
+  deepSearch: z.boolean().optional(),
   spaceId: buddyResourceIdSchema.nullable(),
 }).strict()
 
@@ -107,18 +127,35 @@ export const buddyComposerSourceSelectSchema = buddyComposerResourceTargetSchema
 }).strict()
 
 export const buddyComposerSourceOptionSchema = z.object({
-  category: z.enum(['artifact', 'history', 'space']),
+  category: z.enum(['artifact', 'history', 'space', 'external']),
   description: z.string().nullable(),
   label: z.string().min(1).max(255),
   mimeType: z.string().max(255),
   name: z.string().min(1).max(255),
+  nameSource: z.enum(['file', 'clipboard']).optional(),
+  history: z.object({
+    messageNumber: z.number().int().positive(),
+    createdAt: z.string(),
+  }).strict().optional(),
   path: z.string().nullable(),
-  sizeBytes: z.number().int().nonnegative().max(BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT),
+  kind: z.enum(['file', 'directory']).optional(),
+  sizeBytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   source: buddyComposerSourceSchema,
 }).strict()
 
+export const buddyComposerDirectorySchema = z.object({
+  workingDirectory: z.string().optional(),
+  path: z.string(),
+  query: z.string().optional(),
+  status: z.enum(['ready', 'missing', 'unavailable']),
+  hasMore: z.boolean(),
+}).strict()
+
+export type BuddyComposerDirectory = z.infer<typeof buddyComposerDirectorySchema>
+
 export const buddyComposerSourceListResponseSchema = z.object({
   files: z.array(buddyComposerSourceOptionSchema).max(128),
+  directory: buddyComposerDirectorySchema.optional(),
 }).strict()
 
 export const buddyComposerResourceCompleteSchema = buddyComposerResourceTargetSchema.extend({
@@ -134,6 +171,8 @@ export type BuddySpaceFileSource = z.infer<typeof buddySpaceFileSourceSchema>
 export type BuddySpaceFileOrigin = z.infer<typeof buddySpaceFileOriginSchema>
 export type BuddyMessageInputSource = z.infer<typeof buddyMessageInputSourceSchema>
 export type BuddyMessageInputOrigin = z.infer<typeof buddyMessageInputOriginSchema>
+export type BuddyMessageResourceSource = z.infer<typeof buddyMessageResourceSourceSchema>
+export type BuddyLocalResourceOrigin = z.infer<typeof buddyLocalResourceOriginSchema>
 export type BuddyArtifactSource = z.infer<typeof buddyArtifactSourceSchema>
 export type BuddyArtifactOrigin = z.infer<typeof buddyArtifactOriginSchema>
 export type BuddyComposerSource = z.infer<typeof buddyComposerSourceSchema>

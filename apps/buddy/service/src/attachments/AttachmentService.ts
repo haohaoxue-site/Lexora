@@ -1,7 +1,7 @@
 import type { ImageContent } from '@earendil-works/pi-ai'
 import type { Buffer } from 'node:buffer'
 import type { BuddyAttachmentUpload } from '../../../shared/conversation/attachmentPolicy'
-import type { BuddyPromptDirective, BuddyUserContentV1 } from '../../../shared/conversation/buddyUserContent'
+import type { BuddyPromptDirective, BuddyUserContentV1, BuddyUserMessageResourceSnapshot } from '../../../shared/conversation/buddyUserContent'
 import type { BuddyInputReferenceV1 } from '../agent/context/BuddyInputReference'
 import type { AttachmentRecord, AttachmentRepository } from '../storage/attachmentRepository'
 import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
@@ -363,7 +363,7 @@ export class AttachmentService {
     content: string,
     conversationId: string | null = null,
     draftId: string | null = null,
-    composer?: { content: BuddyUserContentV1, resourceIds: readonly string[], resolveDirective?: (directive: BuddyPromptDirective) => string },
+    composer?: { content: BuddyUserContentV1, resourceIds: readonly string[], resources?: readonly BuddyUserMessageResourceSnapshot[], resolveDirective?: (directive: BuddyPromptDirective) => string },
   ): Promise<{ documents: AttachmentFileInput[], images: ImageContent[], prompt: string, records: AttachmentRecord[] }> {
     const prepared = await this.preparePrompt(ids, content, conversationId, draftId, composer)
     return {
@@ -383,7 +383,7 @@ export class AttachmentService {
     content: string,
     conversationId: string | null = null,
     draftId: string | null = null,
-    composer?: { content: BuddyUserContentV1, resourceIds: readonly string[], resolveDirective?: (directive: BuddyPromptDirective) => string },
+    composer?: { content: BuddyUserContentV1, resourceIds: readonly string[], resources?: readonly BuddyUserMessageResourceSnapshot[], resolveDirective?: (directive: BuddyPromptDirective) => string },
   ): Promise<{ documentReferences: AttachmentDocumentReference[], imageReferences: AttachmentImageReference[], prompt: string, records: AttachmentRecord[] }> {
     const records = ids.map(id => this.#requireForPrompt(id, conversationId, draftId))
     validateTotalBytes(records.map(record => record.sizeBytes))
@@ -428,15 +428,19 @@ export class AttachmentService {
     }))
     const projected = composer
       ? projectBuddyUserContent(composer.content, (resourceId) => {
-          const index = composer.resourceIds.indexOf(resourceId)
+          const resource = composer.resources?.find(item => item.resourceId === resourceId)
+          const localReference = resource?.localReference
+          if (localReference && !resource.attachmentId)
+            return { kind: 'local', name: localReference.name, localReference }
+          const index = resource?.attachmentId ? ids.indexOf(resource.attachmentId) : composer.resourceIds.indexOf(resourceId)
           const record = records[index]
           const value = materialized[index]
           if (!record || !value)
             throw new AttachmentError('ATTACHMENT_NOT_FOUND')
           return value.imageReference
-            ? { kind: 'image', name: record.name, nameSource: record.nameSource }
+            ? { kind: 'image', name: record.name, nameSource: record.nameSource, localReference }
             : value.documentReference
-              ? { kind: getDocumentKind(value.documentReference.mimeType), name: record.name }
+              ? { kind: getDocumentKind(value.documentReference.mimeType), name: record.name, localReference }
               : { kind: 'text', name: record.name, text: value.text! }
         }, (directive) => {
           if (!composer.resolveDirective)
@@ -717,7 +721,7 @@ export function normalizeAttachmentMetadata(input: { mimeType: string, name: str
   return { mimeType, name, sizeBytes: input.sizeBytes }
 }
 
-function inferMimeType(path: string): string {
+export function inferMimeType(path: string): string {
   const extension = extname(path).toLowerCase()
   return MIME_TYPES[extension] ?? (textExtensions.has(extension.slice(1)) ? 'text/plain' : 'application/octet-stream')
 }

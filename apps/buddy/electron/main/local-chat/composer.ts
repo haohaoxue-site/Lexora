@@ -1,5 +1,4 @@
 import type { LocalChatIpcContext } from './registrar'
-import { BUDDY_ATTACHMENT_DIALOG_EXTENSIONS } from '../../../shared/conversation/attachmentPolicy'
 import { composerDraftsRpc, composerRequestSchemas, composerResourcesRpc } from '../../../shared/conversation/composerApi'
 import { LOCAL_CHAT_IPC_CHANNELS } from '../../shared/localChatApi'
 import { translateDesktopNative } from '../desktopNativeI18n'
@@ -33,7 +32,6 @@ export function registerComposerIpc(context: LocalChatIpcContext): void {
   handle(LOCAL_CHAT_IPC_CHANNELS.composerResourcesSelectFiles, async (_event, input) => {
     const { draftId, referencedResourceIds } = composerRequestSchemas.composerResourceFileSelect.parse(input)
     const paths = await selectPaths(options.getWindow(), {
-      filters: [{ extensions: [...BUDDY_ATTACHMENT_DIALOG_EXTENSIONS], name: 'Lexora Buddy' }],
       properties: ['openFile', 'multiSelections'],
       title: translateDesktopNative(options.getLanguage(), 'selectAttachments'),
     })

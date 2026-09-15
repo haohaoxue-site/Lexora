@@ -27,7 +27,7 @@ export interface UseChatComposerOptions {
   selectedModel: Readonly<Ref<LocalRuntimeModelOption | null>>
   selectedEffort: Readonly<Ref<BuddyThinkingLevel | null>>
   selectedServiceTier: Readonly<Ref<BuddyServiceTier | null>>
-  loadContextOptions: (fileQuery: string | null) => Promise<ChatComposerContextOptions>
+  loadContextOptions: (fileQuery: string | null, deepSearch?: boolean) => Promise<ChatComposerContextOptions>
   beginImport: (files: readonly File[], origin?: 'file' | 'clipboard') => readonly string[]
   selectSource: (source: BuddyComposerSource) => Promise<string | null>
   onSend: (payload: ChatComposerSubmitPayload) => void
@@ -70,7 +70,7 @@ export interface DesktopChatComposerProps {
   isUpdatingPermissionSettings: boolean
   interaction: ChatComposerInteraction | null
   language: BuddyLocale
-  loadContextOptions: (fileQuery: string | null) => Promise<ChatComposerContextOptions>
+  loadContextOptions: (fileQuery: string | null, deepSearch?: boolean) => Promise<ChatComposerContextOptions>
   models: ReadonlyArray<LocalRuntimeModelOption>
   permissionMode: BuddyPermissionMode
   providers: ReadonlyArray<LocalProvider>

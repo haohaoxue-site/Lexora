@@ -308,10 +308,11 @@ describe('buddy runtime cross-subsystem contract', () => {
         rpc: harness.rpc,
       })
       await harness.invoke('providers.upsertCustom', offlineProviderConfig(provider.baseUrl))
-      const attachments = await harness.invoke('composerResources.registerFiles', {
+      await harness.invoke('composerResources.accept', {
         draftId: 'draft-attachment-recovery-1',
-        paths: [keptSource, missingSource],
-      }) as ReadonlyArray<BuddyComposerResource>
+        resources: [keptSource, missingSource].map((sourcePath, index) => ({ resourceId: `recovery-${index}`, name: `recovery-${index}.png`, mimeType: 'image/png', sizeBytes: keptBytes.length, sourcePath, storage: 'snapshot' })),
+      })
+      const attachments = await Promise.all([0, 1].map(index => harness.invoke('composerResources.complete', { draftId: 'draft-attachment-recovery-1', resourceId: `recovery-${index}`, bytes: Uint8Array.from(keptBytes) }))) as ReadonlyArray<BuddyComposerResource>
       expect(attachments).toHaveLength(2)
       const attachmentIds = attachments.map((resource) => {
         if (resource.state !== 'ready' || !('attachmentId' in resource))

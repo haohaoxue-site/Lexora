@@ -1,7 +1,8 @@
 import type { ReadToolDetails, ReadToolOptions, ToolDefinition } from '@earendil-works/pi-coding-agent'
 import type { BuddyInProcessExtension } from './BuddyInProcessExtension'
 import { Buffer } from 'node:buffer'
-import { readFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { open } from 'node:fs/promises'
 import { createReadToolDefinition, detectSupportedImageMimeTypeFromFile } from '@earendil-works/pi-coding-agent'
 import { filePaths } from '../../../../platform/filesystem/filePaths'
 import { projectReadHistory } from '../context/projectReadHistory'
@@ -22,7 +23,36 @@ export function createBuddyReadTool(cwd: string, options?: Pick<ReadToolOptions,
     async execute(toolCallId, parameters, signal, onUpdate, context) {
       signal?.throwIfAborted()
       const path = filePaths.resolveInput(parameters.path, context.cwd || cwd)
-      const bytes = await readFile(path, { signal })
+      const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK)
+      let bytes: Buffer
+      try {
+        const metadata = await handle.stat()
+        if (!metadata.isFile())
+          throw new Error('read requires a regular file. Use a directory listing tool for directories; devices and pipes cannot be read.')
+        const header = Buffer.alloc(16)
+        const { bytesRead } = await handle.read(header, 0, header.length, 0)
+        const format = detectBinaryReadFormat(header.subarray(0, bytesRead))
+        if (format || metadata.size > 32 * 1024 * 1024) {
+          const description = format ?? 'File exceeding the 32 MiB read memory limit'
+          return {
+            content: [{ type: 'text', text: `${description}, ${metadata.size} bytes. ${READ_CONTENT_NOTICE}` }],
+            details: { contentOmitted: { format: description, sizeBytes: metadata.size } },
+          }
+        }
+        bytes = Buffer.alloc(metadata.size)
+        let position = 0
+        while (position < bytes.length) {
+          signal?.throwIfAborted()
+          const read = await handle.read(bytes, position, Math.min(64 * 1024, bytes.length - position), position)
+          if (!read.bytesRead)
+            break
+          position += read.bytesRead
+        }
+        bytes = bytes.subarray(0, position)
+      }
+      finally {
+        await handle.close()
+      }
       signal?.throwIfAborted()
       const format = detectBinaryReadFormat(bytes)
       if (format) {

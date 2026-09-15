@@ -140,7 +140,7 @@ function readText(content: unknown, attachments: readonly { id: string, name: st
   const structured = readBuddyUserMessageContent(content)
   if (structured) {
     const names = new Map(attachments.map(attachment => [attachment.id, attachment.name]))
-    const resources = new Map(structured.resourceSnapshots.map(snapshot => [snapshot.resourceId, names.get(snapshot.attachmentId) ?? 'file']))
+    const resources = new Map(structured.resourceSnapshots.map(snapshot => [snapshot.resourceId, snapshot.localReference?.name ?? names.get(snapshot.attachmentId ?? '') ?? 'file']))
     const text = buddyUserContentToText(structured.userContent, id => `@${resources.get(id) ?? 'file'}`)
     return text
   }

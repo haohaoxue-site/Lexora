@@ -53,6 +53,11 @@ const {
   closeSuggestions,
   editor,
   isLoadingContext,
+  contextLoadFailed,
+  contextOptions,
+  deepSearch,
+  setDeepSearch,
+  navigateDirectory,
   loadContextOptions,
   modelInputIssue,
   resourceStripResources,
@@ -78,7 +83,7 @@ const {
   isRunning: toRef(props, 'isRunning'),
   isSending: toRef(props, 'isSending'),
   language: toRef(props, 'language'),
-  loadContextOptions: query => props.loadContextOptions(query),
+  loadContextOptions: (query, deepSearch) => props.loadContextOptions(query, deepSearch),
   beginImport: (files, origin) => props.beginImport(files, origin),
   selectSource: source => props.selectSource(source),
   onSend: payload => emit('send', payload),
@@ -101,9 +106,11 @@ const suggestionOptions = computed(() => suggestions.value.map(({ option }) => o
 const chooserVisible = computed(() => !sourceMenuOpen.value && Boolean(
   activeTrigger.value && (activeTrigger.value.kind === 'mention' || activeTrigger.value.kind === 'skill' || suggestions.value.length || isLoadingContext.value),
 ))
-const suggestionEmptyLabel = computed(() => activeTrigger.value?.kind === 'mention'
-  ? t(activeTrigger.value.query ? 'desktop.chat.sourcePickerNoMatches' : 'desktop.chat.sourcePickerNoReferences')
-  : t('desktop.chat.sourcePickerEmpty'))
+const suggestionEmptyLabel = computed(() => contextLoadFailed.value
+  ? t('desktop.chat.sourcePickerLoadFailed')
+  : activeTrigger.value?.kind === 'mention'
+    ? t(activeTrigger.value.query ? 'desktop.chat.sourcePickerNoMatches' : 'desktop.chat.sourcePickerNoReferences')
+    : t('desktop.chat.sourcePickerEmpty'))
 const modelInputIssueMessage = computed(() => {
   if (modelInputIssue.value === 'reasoning_unsupported')
     return t('desktop.chat.modelReasoningUnsupported', { value: props.selectedEffort ?? '' })
@@ -166,6 +173,12 @@ async function selectConversationFile(option: ChatPromptContextOption) {
             :loading="isLoadingContext"
             :loading-label="t('desktop.chat.loadingContext')"
             :options="suggestionOptions"
+            :directory="activeTrigger?.kind === 'mention' ? contextOptions.directory : undefined"
+            :deep-search="deepSearch"
+            @deep-search-change="setDeepSearch"
+            @navigate="navigateDirectory"
+            @highlight="activeSuggestionIndex = $event"
+            @enter-directory="selectSuggestion($event, 'complete')"
             @select="selectSuggestion"
           />
           <NButton v-if="activeTrigger?.kind === 'skill' && manageSkills" class="desktop-chat-composer__manage-skills" quaternary size="small" @mousedown.prevent @click="manageSkills">

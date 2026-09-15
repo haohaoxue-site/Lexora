@@ -1,8 +1,13 @@
 import type { BuddyServiceSupervisor } from './runtime/BuddyServiceSupervisor'
 import { readFile } from 'node:fs/promises'
-import { protocol } from 'electron'
+import { dirname } from 'node:path'
+import process from 'node:process'
+import { app, protocol } from 'electron'
+import { readNativeBoundedFile } from '../../platform/filesystem/nativeBoundedFile'
+import { resolveBuddyFileReader } from '../../platform/native/nativeHost'
 import { artifactsRequestSchemas, artifactsResponseSchemas } from '../../shared/artifacts/artifactApi'
 import { attachmentsRequestSchemas } from '../../shared/conversation/attachmentApi'
+import { composerResourcesRpc } from '../../shared/conversation/composerApi'
 
 const ATTACHMENT_PROTOCOL = 'lexora-attachment'
 const ARTIFACT_PROTOCOL = 'lexora-artifact'
@@ -30,6 +35,20 @@ export function installAttachmentProtocol(runtime: BuddyServiceSupervisor): () =
       return new Response(null, { status: 405 })
 
     const url = new URL(request.url)
+    if (scheme === ATTACHMENT_PROTOCOL && url.hostname === 'local-preview') {
+      try {
+        const [draftId, resourceId, extra] = url.pathname.slice(1).split('/').map(decodeURIComponent)
+        if (extra !== undefined)
+          return new Response(null, { status: 400 })
+        const input = composerResourcesRpc.resolvePreview.input.parse({ draftId, resourceId })
+        const preview = composerResourcesRpc.resolvePreview.response.parse(await runtime.request(composerResourcesRpc.resolvePreview.method, input))
+        const bytes = await readNativeBoundedFile(dirname(preview.path), preview.path, 10 * 1024 * 1024, request.signal, resolveBuddyFileReader({ appPath: app.getAppPath(), isPackaged: app.isPackaged, resourcesPath: process.resourcesPath }))
+        return new Response(bytes, { headers: { 'cache-control': 'private, no-store', 'content-type': preview.mimeType, 'x-content-type-options': 'nosniff' } })
+      }
+      catch {
+        return new Response(null, { status: 404 })
+      }
+    }
     if (url.hostname !== 'preview')
       return new Response(null, { status: 404 })
 

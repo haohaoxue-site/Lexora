@@ -1,4 +1,4 @@
-import type { BuddyUserContentV1 } from '../../../shared/conversation/buddyUserContent'
+import type { BuddyUserContentV1, BuddyUserMessageResourceSnapshot } from '../../../shared/conversation/buddyUserContent'
 import type {
   BuddyArtifactSource,
   BuddyComposerResource,
@@ -12,46 +12,52 @@ import type {
   BuddyComposerSourceOrigin,
   BuddyComposerSourceSelect,
   BuddyComposerSpaceFileSelect,
+  BuddyLocalResourceOrigin,
   BuddyMessageInputSource,
+  BuddyMessageResourceSource,
   BuddySpaceFileOrigin,
   BuddySpaceFileSource,
 } from '../../../shared/conversation/composerResource'
 import type { ArtifactResource, ArtifactService } from '../artifacts/ArtifactService'
 import type { RunEventReader } from '../events/RunEventPorts'
-import type { SpaceService } from '../spaces/SpaceService'
+import type { ResolvedInteractiveModelSelection } from '../providers/resolveInteractiveModelSelection'
 import type { AttachmentRecord } from '../storage/attachmentRepository'
+import type { BuddyDataPaths } from '../storage/BuddyDataPaths'
 import type { ComposerDraftRepository } from '../storage/composerDraftRepository'
 import type { ComposerResourceRecord, ComposerResourceRepository } from '../storage/composerResourceRepository'
 import type { ConversationDirectoryGrantRepository } from '../storage/conversationDirectoryGrantRepository'
 import type { ConversationRepository } from '../storage/conversationRepository'
 import type { SpaceRepository } from '../storage/spaceRepository'
 import type { AttachmentService } from './AttachmentService'
-import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
-import { open, stat } from 'node:fs/promises'
-import { basename, isAbsolute, join, relative } from 'node:path'
+import { realpath } from 'node:fs/promises'
+import { dirname, isAbsolute, join, relative } from 'node:path'
 import { readBoundedFile } from '../../../platform/filesystem/boundedFile'
 import { BUDDY_ATTACHMENT_COUNT_LIMIT, BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT, getAttachmentKind } from '../../../shared/conversation/attachmentPolicy'
-import { getBuddyUserContentResourceIds } from '../../../shared/conversation/buddyUserContent'
+import { getBuddyUserContentResourceIds, readBuddyUserMessageContent } from '../../../shared/conversation/buddyUserContent'
 import { buddyComposerResourceAcceptSchema, buddyComposerSourceListSchema, buddyComposerSourceSelectSchema, buddyComposerSpaceFileSelectSchema } from '../../../shared/conversation/composerResource'
 import { buddyRunOutputPayloadSchema } from '../../../shared/runs/runOutput'
 import { resolveGrantedPath } from '../directories/resolveGrantedPath'
 import { createSensitivePathMatcher } from '../permissions/sensitivePaths'
+import { base64BytesLength, getModelRequestBytesLimit } from '../providers/modelInputBudget'
 import { BuddyServiceError } from '../rpc/runtimeRequest'
 import { requireActiveSpace } from '../spaces/requireActiveSpace'
 import { ComposerResourceConflictError } from '../storage/composerResourceRepository'
 import { AttachmentError, DRAFT_ATTACHMENT_RETENTION_MS, normalizeAttachmentMetadata } from './AttachmentService'
+import { ComposerDirectorySources } from './ComposerDirectorySources'
+import { historicalComposerSources } from './historicalComposerSources'
+import { inspectLocalResource } from './localResource'
 import { validateResourceBytes } from './validateResourceBytes'
 
 export interface ComposerResourceServiceOptions {
   artifacts?: Pick<ArtifactService, 'listConversationArtifacts' | 'resolveConversationArtifactLocation'>
-  attachments: Pick<AttachmentService, 'cleanupDrafts' | 'listForConversation' | 'registerFiles' | 'registerUploads' | 'release'>
+  attachments: Pick<AttachmentService, 'cleanupDrafts' | 'listForConversation' | 'registerFiles' | 'registerUploads' | 'release' | 'resolvePreview'>
   conversationGrants?: Pick<ConversationDirectoryGrantRepository, 'listActive'>
   conversations?: Pick<ConversationRepository, 'findById' | 'listBranchMessages'>
   drafts?: Pick<ComposerDraftRepository, 'findById'>
   eventLog?: Pick<RunEventReader, 'listForRuns'>
+  paths: Pick<BuddyDataPaths, 'conversationWorkspace' | 'draftAttachments' | 'spaceWorkspace'>
   repository: ComposerResourceRepository
-  spaceFiles?: Pick<SpaceService, 'searchFiles'>
   spaces?: Pick<SpaceRepository, 'findById'>
 }
 
@@ -68,10 +74,11 @@ export class ComposerResourceService {
   readonly #conversations: ComposerResourceServiceOptions['conversations']
   readonly #drafts: ComposerResourceServiceOptions['drafts']
   readonly #eventLog: ComposerResourceServiceOptions['eventLog']
+  readonly #paths: ComposerResourceServiceOptions['paths']
   readonly #repository: ComposerResourceRepository
   readonly #importing = new Set<string>()
   readonly #spaces: ComposerResourceServiceOptions['spaces']
-  readonly #spaceFiles: ComposerResourceServiceOptions['spaceFiles']
+  readonly #directories: ComposerDirectorySources
   readonly #sensitivePaths = createSensitivePathMatcher()
 
   constructor(options: ComposerResourceServiceOptions) {
@@ -81,21 +88,25 @@ export class ComposerResourceService {
     this.#conversations = options.conversations
     this.#drafts = options.drafts
     this.#eventLog = options.eventLog
+    this.#paths = options.paths
     this.#repository = options.repository
     this.#spaces = options.spaces
-    this.#spaceFiles = options.spaceFiles
+    this.#directories = new ComposerDirectorySources(options)
   }
 
-  accept(input: BuddyComposerResourceAccept): BuddyComposerResource[] {
+  async accept(input: BuddyComposerResourceAccept): Promise<BuddyComposerResource[]> {
     const parsed = buddyComposerResourceAcceptSchema.parse(input)
-    const resources = parsed.resources.map(resource => ({
-      ...normalizeAttachmentMetadata(resource),
-      nameSource: resource.nameSource,
-      sourcePath: resource.sourcePath,
-      resourceId: resource.resourceId,
+    const incoming = await Promise.all(parsed.resources.map(async (resource) => {
+      if (resource.storage === 'reference') {
+        const localReference = await inspectLocalResource(resource.sourcePath!)
+        return { resource, localReference }
+      }
+      return { resource: { ...resource, ...normalizeAttachmentMetadata(resource) }, localReference: null }
     }))
     try {
-      return this.#repository.accept(input.draftId, resources, new Date().toISOString()).map(toPublicResource)
+      return this.#repository.acceptBatch(input.draftId, incoming.map(({ resource, localReference }) => localReference
+        ? { metadata: { ...localReference, sourcePath: localReference.path, resourceId: resource.resourceId }, source: { localReference } }
+        : { metadata: resource }), new Date().toISOString()).map(toPublicResource)
     }
     catch (error) {
       if (error instanceof ComposerResourceConflictError)
@@ -108,27 +119,44 @@ export class ComposerResourceService {
     return this.#repository.listForDraft(draftId).map(toPublicResource)
   }
 
+  async resolvePreview(target: BuddyComposerResourceTarget): Promise<{ mimeType: string, path: string }> {
+    const resource = this.#requireOwned(target)
+    const draft = this.#drafts?.findById(target.draftId)
+    if (!draft || resource.state !== 'ready' || !resource.source || !('localReference' in resource.source))
+      throw new AttachmentError('ATTACHMENT_NOT_FOUND')
+    const conversationId = 'conversationId' in draft.scope ? draft.scope.conversationId : null
+    const scope = this.#resolveScope({
+      draftId: target.draftId,
+      branchId: 'branchId' in draft.scope ? draft.scope.branchId : null,
+      conversationId,
+      query: '',
+      spaceId: 'spaceId' in draft.scope ? draft.scope.spaceId : conversationId ? this.#conversations?.findById(conversationId)?.spaceId ?? null : null,
+    })
+    const { input } = await this.#resolveLocalInput(resource, resource.source, scope, undefined, 0)
+    if (input.attachmentId)
+      return this.#attachments.resolvePreview(input.attachmentId)
+    const reference = input.localReference!
+    if (reference.kind !== 'file' || !['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'image/bmp'].includes(reference.mimeType) || reference.sizeBytes > 10 * 1024 * 1024)
+      throw new AttachmentError('ATTACHMENT_UNSUPPORTED')
+    return { mimeType: reference.mimeType, path: reference.path }
+  }
+
   async selectSpaceFile(
     input: BuddyComposerSpaceFileSelect,
     referencedResourceIds: readonly string[] = [],
   ): Promise<BuddyComposerResource> {
     const parsed = buddyComposerSpaceFileSelectSchema.parse(input)
-    const { source, metadata } = await this.#resolveSpaceFile(parsed.source)
-    this.#assertCapacity(parsed.draftId, referencedResourceIds, [metadata])
-    return toPublicResource(this.#repository.selectSpaceFile(parsed.draftId, {
-      ...metadata,
-      resourceId: parsed.resourceId,
-    }, source, new Date().toISOString()))
+    return this.selectSource(parsed, referencedResourceIds)
   }
 
   async listSources(input: BuddyComposerSourceList): Promise<BuddyComposerSourceListResponse> {
     const parsed = buddyComposerSourceListSchema.parse(input)
     const scope = this.#resolveScope(parsed)
-    const [spaceFiles, conversationFiles] = await Promise.all([
-      this.#listSpaceSources(scope.spaceId, parsed.query),
+    const [directorySources, conversationFiles] = await Promise.all([
+      this.#directories.list(scope, parsed.draftId, parsed.query, parsed.deepSearch ?? false),
       this.#listConversationSources(scope, parsed.query),
     ])
-    return { files: [...spaceFiles, ...conversationFiles].slice(0, 128) }
+    return { ...directorySources, files: [...directorySources.files.slice(0, 64), ...conversationFiles.filter(file => file.category === 'history').slice(0, 32), ...conversationFiles.filter(file => file.category === 'artifact').slice(0, 32)] }
   }
 
   async selectSource(
@@ -137,7 +165,7 @@ export class ComposerResourceService {
   ): Promise<BuddyComposerResource> {
     const parsed = buddyComposerSourceSelectSchema.parse(input)
     const resolved = await this.#resolveSource(parsed.source)
-    this.#assertCapacity(parsed.draftId, referencedResourceIds, [resolved.metadata])
+    this.#assertCapacity(parsed.draftId, referencedResourceIds, [{ sizeBytes: 'localReference' in resolved.source ? 0 : resolved.metadata.sizeBytes }])
     return toPublicResource(this.#repository.selectSource(parsed.draftId, {
       ...resolved.metadata,
       resourceId: parsed.resourceId,
@@ -155,7 +183,7 @@ export class ComposerResourceService {
     return this.selectSpaceFile({ draftId, resourceId: randomUUID(), source: { spaceId, bindingId: binding.id, relativePath: relative(binding.canonicalRoot, resolution.canonicalPath) } })
   }
 
-  async resolveInput(draftId: string, content: BuddyUserContentV1, scope: ComposerSourceScope = { branchId: null, conversationId: null, spaceId: null }): Promise<{ attachmentId: string, resourceId: string }[]> {
+  async resolveInput(draftId: string, content: BuddyUserContentV1, scope: ComposerSourceScope = { branchId: null, conversationId: null, spaceId: null }, model?: Pick<ResolvedInteractiveModelSelection, 'input' | 'fileInputMimeTypes' | 'api'>): Promise<BuddyUserMessageResourceSnapshot[]> {
     const resourceIds = getBuddyUserContentResourceIds(content)
     if (resourceIds.length > BUDDY_ATTACHMENT_COUNT_LIMIT)
       throw new AttachmentError('VALIDATION_FAILED')
@@ -169,16 +197,27 @@ export class ComposerResourceService {
         throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
       return resource
     })
-    const result: { attachmentId: string, resourceId: string }[] = []
+    const result: BuddyUserMessageResourceSnapshot[] = []
+    const orderedResources = resources.toSorted((left, right) => Number(isNewLocalReference(left)) - Number(isNewLocalReference(right)))
     let totalBytes = 0
-    for (const resource of resources) {
+    let remainingNativeBytes = Math.min(base64BytesLength(BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT), (model ? getModelRequestBytesLimit(model.api) : null) ?? Number.POSITIVE_INFINITY) - 1024 * 1024
+    for (const resource of orderedResources) {
+      if (resource.source && 'localReference' in resource.source) {
+        const snapshot = await this.#resolveLocalInput(resource, resource.source, scope, model, Math.min(remainingNativeBytes, base64BytesLength(BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT - totalBytes)))
+        result.push(snapshot.input)
+        totalBytes += snapshot.bytes
+        remainingNativeBytes -= base64BytesLength(snapshot.bytes) + 512
+        continue
+      }
       if (!resource.source) {
         totalBytes += resource.sizeBytes
+        remainingNativeBytes -= base64BytesLength(resource.sizeBytes) + 512
         result.push({ attachmentId: resource.attachmentId!, resourceId: resource.resourceId })
         continue
       }
       const resolved = await this.#resolveSourceOrigin(resource.source, scope)
       totalBytes += resolved.metadata.sizeBytes
+      remainingNativeBytes -= base64BytesLength(resolved.metadata.sizeBytes) + 512
       if (totalBytes > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT)
         throw new AttachmentError('VALIDATION_FAILED')
       if (resolved.attachmentId) {
@@ -194,7 +233,8 @@ export class ComposerResourceService {
     }
     if (totalBytes > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT)
       throw new AttachmentError('VALIDATION_FAILED')
-    return result
+    const snapshots = new Map(result.map(snapshot => [snapshot.resourceId, snapshot]))
+    return resourceIds.map(resourceId => snapshots.get(resourceId)!)
   }
 
   #resolveScope(input: BuddyComposerSourceList): ComposerSourceScope {
@@ -211,70 +251,14 @@ export class ComposerResourceService {
     return { branchId: input.branchId, conversationId: conversation.id, spaceId: conversation.spaceId }
   }
 
-  async #listSpaceSources(spaceId: string | null, query: string): Promise<BuddyComposerSourceOption[]> {
-    if (!spaceId || !this.#spaceFiles)
-      return []
-    const files = await this.#spaceFiles.searchFiles(spaceId, query)
-    const resolved = await Promise.all(files.map(async (file) => {
-      try {
-        const source = { bindingId: file.directoryId, relativePath: file.relativePath, spaceId }
-        const value = await this.#resolveSpaceFile(source)
-        return {
-          category: 'space' as const,
-          description: `${file.root} · ${file.relativePath}`,
-          label: value.metadata.name,
-          ...normalizeAttachmentMetadata(value.metadata),
-          path: file.path,
-          source,
-        }
-      }
-      catch {
-        return null
-      }
-    }))
-    return resolved.filter((value): value is NonNullable<typeof value> => value !== null)
-  }
-
   async #listConversationSources(scope: ComposerSourceScope, query: string): Promise<BuddyComposerSourceOption[]> {
     if (!scope.conversationId || !scope.branchId)
       return []
     const history = this.#requireVisibleHistory(scope.conversationId, scope.branchId)
-    const attachmentsByMessageId = new Map<string, AttachmentRecord[]>()
-    for (const attachment of this.#attachments.listForConversation(scope.conversationId)) {
-      if (!attachment.messageId)
-        continue
-      const messageAttachments = attachmentsByMessageId.get(attachment.messageId) ?? []
-      messageAttachments.push(attachment)
-      attachmentsByMessageId.set(attachment.messageId, messageAttachments)
-    }
-    const historical = history.flatMap((message): BuddyComposerSourceOption[] => {
-      if (message.role !== 'user')
-        return []
-      return (attachmentsByMessageId.get(message.id) ?? []).flatMap((attachment) => {
-        try {
-          const metadata = normalizeAttachmentMetadata(attachment)
-          return [{
-            category: 'history',
-            description: message.createdAt,
-            label: metadata.name,
-            ...metadata,
-            path: null,
-            source: {
-              branchId: scope.branchId!,
-              conversationId: scope.conversationId!,
-              messageId: message.id,
-              attachmentId: attachment.id,
-            },
-          }]
-        }
-        catch {
-          return []
-        }
-      }) ?? []
-    })
+    const historical = historicalComposerSources(history, this.#attachments.listForConversation(scope.conversationId), scope.conversationId, scope.branchId)
     const visibleArtifactIds = this.#visibleArtifactIds(history)
     const artifacts = (await Promise.all((this.#artifacts?.listConversationArtifacts(scope.conversationId) ?? []).map(async (artifact): Promise<BuddyComposerSourceOption | null> => {
-      if (artifact.kind !== 'file' || !visibleArtifactIds.has(artifact.id))
+      if (!visibleArtifactIds.has(artifact.id))
         return null
       const source = {
         artifactId: artifact.id,
@@ -282,14 +266,15 @@ export class ComposerResourceService {
         conversationId: scope.conversationId!,
       }
       try {
-        await this.#validateArtifactGrant(source)
-        const metadata = normalizeAttachmentMetadata(artifact)
+        const location = await this.#validateArtifactGrant(source)
+        const metadata = await inspectLocalResource(location.path)
         return {
           category: 'artifact',
           description: artifact.relativePath,
           label: metadata.name,
           ...metadata,
-          path: artifact.relativePath,
+          kind: metadata.kind,
+          path: location.path,
           source,
         }
       }
@@ -298,7 +283,7 @@ export class ComposerResourceService {
       }
     }))).filter((value): value is BuddyComposerSourceOption => value !== null)
     const normalizedQuery = query.toLowerCase()
-    return [...historical, ...artifacts].filter(option => [option.label, option.path, option.description]
+    return [...historical, ...artifacts].filter(option => [option.label, option.name, option.path, option.history?.createdAt]
       .filter(Boolean)
       .join(' ')
       .toLowerCase()
@@ -309,18 +294,30 @@ export class ComposerResourceService {
     metadata: ReturnType<typeof normalizeAttachmentMetadata> & { nameSource?: 'file' | 'clipboard', sourcePath?: string }
     source: BuddyComposerSourceOrigin
   }> {
+    if ('localPath' in source) {
+      const localReference = await inspectLocalResource(source.localPath)
+      return { metadata: { ...localReference, sourcePath: localReference.path }, source: { localReference } }
+    }
+    if ('resourceId' in source) {
+      const snapshot = this.#resolveMessageResource(source)
+      if (snapshot.localReference)
+        return { metadata: { ...snapshot.localReference, sourcePath: snapshot.localReference.path }, source: { localReference: snapshot.localReference, origin: source } }
+      return this.#resolveSource({ branchId: source.branchId, conversationId: source.conversationId, messageId: source.messageId, attachmentId: snapshot.attachmentId! })
+    }
     if ('artifactId' in source) {
       this.#requireVisibleArtifact(source)
       const { artifact, path } = await this.#validateArtifactGrant(source)
-      if (!artifact || artifact.kind !== 'file')
+      if (!artifact)
         throw new AttachmentError('ATTACHMENT_NOT_FOUND')
-      return { metadata: { ...normalizeAttachmentMetadata(artifact), sourcePath: path }, source }
+      const localReference = await inspectLocalResource(path)
+      return { metadata: { ...localReference, sourcePath: path }, source: { localReference, origin: source } }
     }
     if ('messageId' in source) {
       const attachment = this.#resolveMessageInput(source)
       return { metadata: { ...normalizeAttachmentMetadata(attachment), nameSource: attachment.nameSource, sourcePath: attachment.sourcePath }, source }
     }
-    return this.#resolveSpaceFile(source)
+    const resolved = await this.#resolveSpaceFile(source)
+    return { metadata: resolved.metadata, source: { localReference: resolved.localReference, origin: resolved.source } }
   }
 
   async #resolveSourceOrigin(source: BuddyComposerSourceOrigin, scope: ComposerSourceScope): Promise<{
@@ -328,6 +325,8 @@ export class ComposerResourceService {
     bytes: Uint8Array
     metadata: ReturnType<typeof normalizeAttachmentMetadata> & { nameSource?: 'file' | 'clipboard', sourcePath?: string }
   }> {
+    if ('localReference' in source)
+      throw new AttachmentError('VALIDATION_FAILED')
     if ('artifactId' in source) {
       if (scope.branchId !== source.branchId)
         throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
@@ -353,8 +352,70 @@ export class ComposerResourceService {
     const resolved = await this.#resolveSpaceFile(source)
     if (resolved.source.bindingRevision !== source.bindingRevision)
       throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
-    const bytes = await readBoundedFile(resolved.root, resolved.path, resolved.metadata.sizeBytes + 1)
-    return { attachmentId: null, bytes: Uint8Array.from(bytes), metadata: resolved.metadata }
+    const metadata = { ...resolved.metadata, ...normalizeAttachmentMetadata(resolved.metadata) }
+    const bytes = await readBoundedFile(resolved.root, resolved.path, metadata.sizeBytes + 1)
+    return { attachmentId: null, bytes: Uint8Array.from(bytes), metadata }
+  }
+
+  #resolveMessageResource(source: BuddyMessageResourceSource): BuddyUserMessageResourceSnapshot {
+    const message = this.#requireVisibleHistory(source.conversationId, source.branchId).find(item => item.id === source.messageId)
+    const snapshot = message?.role === 'user' ? readBuddyUserMessageContent(message.content)?.resourceSnapshots.find(item => item.resourceId === source.resourceId) : null
+    if (!snapshot)
+      throw new AttachmentError('ATTACHMENT_NOT_FOUND')
+    return snapshot
+  }
+
+  async #resolveLocalInput(resource: ComposerResourceRecord, source: BuddyLocalResourceOrigin, scope: ComposerSourceScope, model: Pick<ResolvedInteractiveModelSelection, 'input' | 'fileInputMimeTypes' | 'api'> | undefined, remainingBytes: number): Promise<{ bytes: number, input: BuddyUserMessageResourceSnapshot }> {
+    const origin = source.origin
+    if (origin && 'conversationId' in origin && (origin.conversationId !== scope.conversationId || origin.branchId !== scope.branchId))
+      throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
+    if (origin && 'resourceId' in origin) {
+      const snapshot = this.#resolveMessageResource(origin)
+      const attachment = snapshot.attachmentId ? this.#resolveMessageInput({ ...origin, attachmentId: snapshot.attachmentId }) : null
+      return { bytes: attachment?.sizeBytes ?? 0, input: { ...snapshot, resourceId: resource.resourceId } }
+    }
+    if (origin && 'spaceId' in origin) {
+      if (origin.spaceId !== scope.spaceId)
+        throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
+      const current = await this.#resolveSpaceFile(origin)
+      if (current.source.bindingRevision !== origin.bindingRevision || current.path !== source.localReference.path)
+        throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
+    }
+    if (origin && 'artifactId' in origin) {
+      this.#requireVisibleArtifact(origin)
+      if ((await this.#validateArtifactGrant(origin)).path !== source.localReference.path)
+        throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
+    }
+    const localReference = await inspectLocalResource(source.localReference.path)
+    if (localReference.path !== source.localReference.path || localReference.kind !== source.localReference.kind)
+      throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
+    const input: BuddyUserMessageResourceSnapshot = { localReference, resourceId: resource.resourceId }
+    const nativeSupported = model && (localReference.mimeType.startsWith('image/')
+      ? model.input.includes('image')
+      : (model.fileInputMimeTypes as readonly string[]).includes(localReference.mimeType))
+    if (localReference.kind !== 'file' || !nativeSupported || base64BytesLength(localReference.sizeBytes) + 512 > remainingBytes)
+      return { bytes: 0, input }
+    try {
+      normalizeAttachmentMetadata(localReference)
+    }
+    catch (error) {
+      if (error instanceof AttachmentError && ['ATTACHMENT_TOO_LARGE', 'ATTACHMENT_UNSUPPORTED', 'ATTACHMENT_INVALID'].includes(error.code))
+        return { bytes: 0, input }
+      throw error
+    }
+    const bytes = await readBoundedFile(dirname(localReference.path), localReference.path, localReference.sizeBytes + 1)
+    try {
+      await validateResourceBytes(localReference, bytes)
+    }
+    catch (error) {
+      if (error instanceof AttachmentError && error.code === 'ATTACHMENT_INVALID')
+        return { bytes: 0, input }
+      throw error
+    }
+    const [attachment] = await this.#attachments.registerUploads(resource.draftId, [{ ...localReference, sourcePath: localReference.path, bytes: Uint8Array.from(bytes) }])
+    if (!attachment)
+      throw new AttachmentError('ATTACHMENT_NOT_FOUND')
+    return { bytes: localReference.sizeBytes, input: { ...input, attachmentId: attachment.id } }
   }
 
   #resolveMessageInput(source: BuddyMessageInputSource): AttachmentRecord {
@@ -410,12 +471,13 @@ export class ComposerResourceService {
         })()
           .filter(grant => grant !== null)
       : this.#conversationGrants?.listActive(conversation.id) ?? []
+    const ownerId = conversation.spaceId ?? conversation.id
     const grant = grants.find(item => item.id === artifact.directoryGrantId) ?? (
-      !conversation.spaceId && artifact.directoryGrantId === conversation.id
+      artifact.directoryGrantId === ownerId
         ? {
-            canonicalRoot: location.canonicalRoot,
-            id: conversation.id,
-            root: location.canonicalRoot,
+            canonicalRoot: await realpath(conversation.spaceId ? this.#paths.spaceWorkspace(ownerId) : this.#paths.conversationWorkspace(ownerId)),
+            id: ownerId,
+            root: conversation.spaceId ? this.#paths.spaceWorkspace(ownerId) : this.#paths.conversationWorkspace(ownerId),
           }
         : null
     )
@@ -442,6 +504,7 @@ export class ComposerResourceService {
     path: string
     root: string
     source: BuddySpaceFileOrigin
+    localReference: Awaited<ReturnType<typeof inspectLocalResource>>
   }> {
     const space = requireActiveSpace(this.#spaces?.findById(source.spaceId) ?? null)
     const binding = [space.primaryDirectory, ...space.additionalDirectories].find(directory => directory?.id === source.bindingId)
@@ -455,15 +518,13 @@ export class ComposerResourceService {
     }], join(binding.canonicalRoot, source.relativePath), 'existing')
     if (this.#sensitivePaths.matches(resolution.canonicalPath))
       throw new BuddyServiceError('DIRECTORY_NOT_AUTHORIZED')
-    const info = await stat(resolution.canonicalPath)
-    if (!info.isFile())
-      throw new AttachmentError('VALIDATION_FAILED')
-    const metadata = normalizeAttachmentMetadata({ name: basename(resolution.canonicalPath), mimeType: '', sizeBytes: info.size })
+    const localReference = await inspectLocalResource(resolution.canonicalPath)
     return {
-      metadata: { ...metadata, sourcePath: resolution.canonicalPath },
+      metadata: { ...localReference, sourcePath: resolution.canonicalPath },
+      localReference,
       path: resolution.canonicalPath,
       root: binding.canonicalRoot,
-      source: { bindingId: binding.id, bindingRevision: binding.revision, relativePath: relative(binding.canonicalRoot, resolution.canonicalPath), spaceId: space.id },
+      source: { bindingId: binding.id, bindingRevision: binding.revision, relativePath: relative(binding.canonicalRoot, resolution.canonicalPath) || '.', spaceId: space.id },
     }
   }
 
@@ -540,29 +601,18 @@ export class ComposerResourceService {
     const capacity = this.#remainingCapacity(draftId, referencedResourceIds)
     if (paths.length > capacity.count)
       throw new AttachmentError('ATTACHMENT_LIMIT_EXCEEDED')
-    const attachments = await this.#attachments.registerFiles(draftId, paths, {
-      ...capacity,
-      errorCode: 'ATTACHMENT_LIMIT_EXCEEDED',
-    })
-    const resources = this.accept({
+    const locals = await Promise.all(paths.map(path => inspectLocalResource(path)))
+    return this.accept({
       draftId,
-      resources: attachments.map(attachment => ({
-        mimeType: attachment.mimeType,
-        name: attachment.name,
-        sourcePath: attachment.sourcePath,
+      resources: locals.map(resource => ({
+        mimeType: resource.mimeType,
+        name: resource.name,
+        sourcePath: resource.path,
+        storage: 'reference',
         resourceId: randomUUID(),
-        sizeBytes: attachment.sizeBytes,
+        sizeBytes: resource.sizeBytes,
       })),
     })
-    return Promise.all(resources.map(async (resource, index) => {
-      try {
-        await this.#bindExisting(resource, attachments[index]!)
-        return toPublicResource(this.#requireOwned(resource))
-      }
-      catch {
-        return this.fail(resource)
-      }
-    }))
   }
 
   recoverInterruptedImports(unavailableAttachmentIds: readonly string[] = []): void {
@@ -596,33 +646,6 @@ export class ComposerResourceService {
     return this.#attachments.cleanupDrafts(now, retainedAttachmentIds)
   }
 
-  async #bindExisting(resource: BuddyComposerResource, attachment: AttachmentRecord): Promise<void> {
-    const file = await open(attachment.storedPath, 'r')
-    let bytes: Buffer
-    try {
-      bytes = Buffer.alloc(resource.sizeBytes + 1)
-      let offset = 0
-      while (offset < bytes.length) {
-        const { bytesRead } = await file.read(bytes, offset, bytes.length - offset)
-        if (!bytesRead)
-          break
-        offset += bytesRead
-      }
-      bytes = bytes.subarray(0, offset)
-    }
-    finally {
-      await file.close()
-    }
-    await validateResourceBytes(resource, bytes)
-    this.#repository.finish({
-      attachmentId: attachment.id,
-      contentHash: createHash('sha256').update(bytes).digest('hex'),
-      draftId: resource.draftId,
-      now: new Date().toISOString(),
-      resourceId: resource.resourceId,
-    })
-  }
-
   #requireOwned(input: BuddyComposerResourceTarget): ComposerResourceRecord {
     const resource = this.#repository.findById(input.resourceId)
     if (!resource || resource.draftId !== input.draftId)
@@ -649,7 +672,10 @@ export class ComposerResourceService {
       throw new AttachmentError('VALIDATION_FAILED')
     }
     const usedBytes = referencedResourceIds.reduce(
-      (total, resourceId) => total + this.#requireOwned({ draftId, resourceId }).sizeBytes,
+      (total, resourceId) => {
+        const resource = this.#requireOwned({ draftId, resourceId })
+        return total + (resource.source && 'localReference' in resource.source ? 0 : resource.sizeBytes)
+      },
       0,
     )
     if (usedBytes > BUDDY_ATTACHMENT_TOTAL_BYTES_LIMIT)
@@ -661,10 +687,16 @@ export class ComposerResourceService {
   }
 }
 
+function isNewLocalReference(resource: ComposerResourceRecord): boolean {
+  return Boolean(resource.source && 'localReference' in resource.source && !(resource.source.origin && 'resourceId' in resource.source.origin))
+}
+
 function toPublicResource(resource: ComposerResourceRecord): BuddyComposerResource {
+  const localReference = resource.source && 'localReference' in resource.source ? resource.source.localReference : undefined
   const base = {
     draftId: resource.draftId,
-    kind: getAttachmentKind(resource.mimeType),
+    kind: localReference?.kind === 'directory' ? 'directory' as const : resource.mimeType === 'application/octet-stream' ? 'binary' as const : getAttachmentKind(resource.mimeType),
+    localReference,
     mimeType: resource.mimeType,
     name: resource.name,
     nameSource: resource.nameSource,

@@ -33,7 +33,7 @@ export function getChatMessageText(message: LocalMessage): string {
     const resourceLabels = new Map(
       structured.resourceSnapshots.map(snapshot => [
         snapshot.resourceId,
-        attachmentNames.get(snapshot.attachmentId) ?? 'file',
+        snapshot.localReference?.name ?? attachmentNames.get(snapshot.attachmentId ?? '') ?? 'file',
       ]),
     )
     return buddyUserContentToText(

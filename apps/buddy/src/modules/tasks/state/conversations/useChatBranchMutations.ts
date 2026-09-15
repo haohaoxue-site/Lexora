@@ -190,7 +190,7 @@ export function useChatBranchMutations(options: UseChatBranchMutationsOptions) {
       }
       for (const snapshot of sourceContent?.resourceSnapshots ?? []) {
         const selected = await options.selectComposerSource({
-          attachmentId: snapshot.attachmentId,
+          resourceId: snapshot.resourceId,
           branchId: parentBranchId,
           conversationId,
           messageId: userMessageId,

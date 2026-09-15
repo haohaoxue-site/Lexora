@@ -50,8 +50,10 @@ import {
   parseBuddyChatCommand,
 } from '../../../shared/conversation/buddyChatCommands'
 import {
+  bindResourceAttachments,
   buddyUserContentToText,
   buddyUserMessageContentV1Schema,
+  getResourceAttachmentIds,
 } from '../../../shared/conversation/buddyUserContent'
 import { isBuddyThinkingLevel } from '../../../shared/conversation/modelSelection'
 import { safeDiagnosticReporter } from '../../../shared/diagnostics/applicationDiagnostic'
@@ -124,7 +126,7 @@ interface TurnModelSelection extends Omit<InteractiveModelSelection, 'reasoning'
 }
 
 interface PrepareTurnMaterializationInput {
-  composer?: { content: BuddyUserContentV1, resourceIds: readonly string[] }
+  composer?: { content: BuddyUserContentV1, resourceIds: readonly string[], resources?: readonly BuddyUserMessageResourceSnapshot[] }
   attachmentIds: readonly string[]
   content: string
   contextItems: readonly ChatContextItem[]
@@ -136,6 +138,7 @@ interface PrepareTurnMaterializationInput {
   space: SpaceRecord | null
   replay: TurnReplay | null
   requestedModel: InteractiveModelSelection | null
+  preparedSelection?: TurnModelSelection
 }
 
 export class ChatTurnService {
@@ -214,15 +217,16 @@ export class ChatTurnService {
     if (this.#options.conversationLifecycle.isDeleting(conversationId))
       throw new BuddyServiceError('VALIDATION_FAILED')
 
+    const selectedModel = await this.#resolveSelection(null, null, draft.modelSelection)
     const resourceInputs = await requireValue(this.#options.composerResources ?? null)
       .resolveInput(input.draftId, draft.content, {
         branchId: existingConversation ? parentBranchId : null,
         conversationId: existingConversation?.id ?? null,
         spaceId: space?.id ?? null,
-      })
+      }, selectedModel)
     if (!content && resourceInputs.length === 0 && !draft.content.quotes?.length)
       throw new BuddyServiceError('VALIDATION_FAILED')
-    const attachmentIds = resourceInputs.map(resource => resource.attachmentId)
+    const attachmentIds = getResourceAttachmentIds(resourceInputs)
 
     const {
       attachmentPrompt,
@@ -235,6 +239,7 @@ export class ChatTurnService {
       composer: {
         content: draft.content,
         resourceIds: resourceInputs.map(resource => resource.resourceId),
+        resources: resourceInputs,
       },
       content: '',
       contextItems: [],
@@ -248,10 +253,11 @@ export class ChatTurnService {
       space,
       replay: null,
       requestedModel: draft.modelSelection,
+      preparedSelection: selectedModel,
     })
     const runId = randomUUID()
     const userMessageId = randomUUID()
-    const resourceNames = new Map(resourceInputs.map((resource, index) => [resource.resourceId, attachmentPrompt.records[index]!.name]))
+    const resourceNames = new Map(resourceInputs.map(resource => [resource.resourceId, resource.localReference?.name ?? attachmentPrompt.records.find(record => record.id === resource.attachmentId)?.name ?? 'file']))
     const messageText = buddyUserContentToText(
       draft.content,
       id => `@${resourceNames.get(id)!}`,
@@ -289,13 +295,10 @@ export class ChatTurnService {
         serviceTier: selection.serviceTier,
       },
       runId,
-      title: createConversationTitle(messageText, attachmentPrompt.records),
+      title: createConversationTitle(messageText || [...resourceNames.values()].join(', '), attachmentPrompt.records),
       userMessageContent: createPersistedUserMessageContent(
         draft.content,
-        resourceInputs.map((resource, index) => ({
-          attachmentId: persistedAttachmentIds[index]!,
-          resourceId: resource.resourceId,
-        })),
+        bindResourceAttachments(resourceInputs, persistedAttachmentIds),
       ),
       userMessageId,
     }
@@ -352,11 +355,13 @@ export class ChatTurnService {
     const forkedFromMessageId = sourceIndex > 0 ? history[sourceIndex - 1]?.id ?? null : null
     const space = this.#resolveConversationSpace(conversation)
     const content = draft ? buddyUserContentToText(draft.content).trim() : ''
+    const selectedModel = draft ? await this.#resolveSelection(null, null, draft.modelSelection) : undefined
     const resourceInputs = draft
       ? await requireValue(this.#options.composerResources ?? null).resolveInput(
           draft.draftId,
           draft.content,
           { branchId: parentBranchId, conversationId: conversation.id, spaceId: space?.id ?? null },
+          selectedModel,
         )
       : []
     if (!replay && !content && resourceInputs.length === 0 && !draft?.content.quotes?.length)
@@ -369,7 +374,7 @@ export class ChatTurnService {
       ))
       validateTurnCommand(content, directiveItems)
     }
-    const attachmentIds = resourceInputs.map(resource => resource.attachmentId)
+    const attachmentIds = getResourceAttachmentIds(resourceInputs)
     const {
       prompt,
       replayInput,
@@ -379,7 +384,7 @@ export class ChatTurnService {
     } = await this.#prepareTurnMaterialization({
       attachmentIds,
       composer: draft
-        ? { content: draft.content, resourceIds: resourceInputs.map(resource => resource.resourceId) }
+        ? { content: draft.content, resourceIds: resourceInputs.map(resource => resource.resourceId), resources: resourceInputs }
         : undefined,
       content: '',
       contextItems: [],
@@ -390,6 +395,7 @@ export class ChatTurnService {
       space,
       replay,
       requestedModel: draft?.modelSelection ?? null,
+      preparedSelection: selectedModel,
     })
     const runId = randomUUID()
     const userMessageId = randomUUID()
@@ -404,10 +410,7 @@ export class ChatTurnService {
     const persistedAttachmentIds = replayInput?.attachmentIds
       ?? stagedAttachments?.bindings.map(binding => binding.id)
       ?? []
-    const persistedResourceSnapshots = resourceInputs.map((resource, index) => ({
-      attachmentId: persistedAttachmentIds[index]!,
-      resourceId: resource.resourceId,
-    }))
+    const persistedResourceSnapshots = replay ? [] : bindResourceAttachments(resourceInputs, persistedAttachmentIds)
     const prepared = await persistPreparedTurn(stagedAttachments, () => (
       replay
         ? this.#options.turnRequests.retryInterrupted({
@@ -594,7 +597,7 @@ export class ChatTurnService {
     const prompt = replayInput?.prompt
       ?? [attachmentPrompt.prompt, context].filter(Boolean).join(PROMPT_SECTION_SEPARATOR)
     assertPromptSize(prompt)
-    const selection = await this.#resolveSelection(
+    const selection = input.preparedSelection ?? await this.#resolveSelection(
       input.replay?.run ?? null,
       replayInput,
       input.requestedModel,

@@ -4,8 +4,7 @@ import process from 'node:process'
 import { BoundedFileReadError } from './boundedFileError'
 import { filePaths } from './filePaths'
 
-export async function readNativeBoundedFile(root: string, path: string, maxBytes: number, signal?: AbortSignal): Promise<Buffer> {
-  const executable = process.env.LEXORA_BUDDY_FILE_READER
+export async function readNativeBoundedFile(root: string, path: string, maxBytes: number, signal?: AbortSignal, executable = process.env.LEXORA_BUDDY_FILE_READER): Promise<Buffer> {
   if (!executable)
     throw new BoundedFileReadError('BOUNDED_FILE_READER_UNAVAILABLE')
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || maxBytes > 64 * 1024 * 1024)

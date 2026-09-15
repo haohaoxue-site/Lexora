@@ -72,16 +72,42 @@ export function createComposerResourceRepository(database: DatabaseSync) {
   `)
   const findSource = database.prepare('SELECT * FROM composer_resources WHERE draft_id = ? AND source_json = ?')
 
+  function acceptOne(draftId: string, resource: BuddyComposerResourceMetadata, now: string): ComposerResourceRecord {
+    const existing = find.get(resource.resourceId) as ComposerResourceRow | undefined
+    if (existing) {
+      if (
+        existing.source_json !== null || existing.draft_id !== draftId || existing.name !== resource.name
+        || existing.name_source !== (resource.nameSource ?? 'file')
+        || existing.source_path !== (resource.sourcePath ?? null)
+        || existing.mime_type !== resource.mimeType || existing.size_bytes !== resource.sizeBytes
+      ) {
+        throw new ComposerResourceConflictError('Resource identity conflict')
+      }
+      return toResource(existing)
+    }
+    insert.run(resource.resourceId, draftId, resource.name, resource.mimeType, resource.sizeBytes, now, now, resource.nameSource ?? 'file', resource.sourcePath ?? null)
+    return toResource(find.get(resource.resourceId) as unknown as ComposerResourceRow)
+  }
+
   return {
-    selectSource(draftId: string, resource: BuddyComposerResourceMetadata, source: BuddyComposerSourceOrigin, now: string) {
+    acceptBatch(draftId: string, resources: readonly { metadata: BuddyComposerResourceMetadata, source?: BuddyComposerSourceOrigin }[], now: string): ComposerResourceRecord[] {
+      return withTransaction(database, () => resources.map(resource => resource.source
+        ? this.selectSource(draftId, resource.metadata, resource.source, now, false)
+        : acceptOne(draftId, resource.metadata, now)))
+    },
+    selectSource(draftId: string, resource: BuddyComposerResourceMetadata, source: BuddyComposerSourceOrigin, now: string, reuseSource = true) {
       const sourceJson = JSON.stringify(buddyComposerSourceOriginSchema.parse(source))
       const existing = find.get(resource.resourceId) as ComposerResourceRow | undefined
       if (existing) {
-        if (existing.draft_id !== draftId || existing.source_json !== sourceJson)
+        if (existing.draft_id !== draftId || existing.source_json === null || sourceIdentity(existing.source_json) !== sourceIdentity(sourceJson))
           throw new ComposerResourceConflictError('Resource identity conflict')
         return toResource(existing)
       }
-      const selected = findSource.get(draftId, sourceJson) as ComposerResourceRow | undefined
+      const selected = reuseSource
+        ? 'localReference' in source
+          ? (list.all(draftId) as unknown as ComposerResourceRow[]).find(row => row.source_json !== null && sourceIdentity(row.source_json) === sourceIdentity(sourceJson))
+          : findSource.get(draftId, sourceJson) as ComposerResourceRow | undefined
+        : undefined
       if (selected)
         return toResource(selected)
       insertSource.run(resource.resourceId, draftId, resource.name, resource.mimeType, resource.sizeBytes, sourceJson, now, now, resource.nameSource ?? 'file', resource.sourcePath ?? null)
@@ -91,22 +117,7 @@ export function createComposerResourceRepository(database: DatabaseSync) {
       return this.selectSource(draftId, resource, source, now)
     },
     accept(draftId: string, resources: readonly BuddyComposerResourceMetadata[], now: string) {
-      return withTransaction(database, () => resources.map((resource) => {
-        const existing = find.get(resource.resourceId) as ComposerResourceRow | undefined
-        if (existing) {
-          if (
-            existing.source_json !== null || existing.draft_id !== draftId || existing.name !== resource.name
-            || existing.name_source !== (resource.nameSource ?? 'file')
-            || existing.source_path !== (resource.sourcePath ?? null)
-            || existing.mime_type !== resource.mimeType || existing.size_bytes !== resource.sizeBytes
-          ) {
-            throw new ComposerResourceConflictError('Resource identity conflict')
-          }
-          return toResource(existing)
-        }
-        insert.run(resource.resourceId, draftId, resource.name, resource.mimeType, resource.sizeBytes, now, now, resource.nameSource ?? 'file', resource.sourcePath ?? null)
-        return toResource(find.get(resource.resourceId) as unknown as ComposerResourceRow)
-      }))
+      return withTransaction(database, () => resources.map(resource => acceptOne(draftId, resource, now)))
     },
     findById(id: string): ComposerResourceRecord | null {
       const row = find.get(id) as ComposerResourceRow | undefined
@@ -143,6 +154,11 @@ export function createComposerResourceRepository(database: DatabaseSync) {
       ))
     },
   }
+}
+
+function sourceIdentity(value: string): string {
+  const source = buddyComposerSourceOriginSchema.parse(JSON.parse(value))
+  return JSON.stringify('localReference' in source ? { kind: source.localReference.kind, path: source.localReference.path, origin: source.origin } : source)
 }
 
 function toResource(row: ComposerResourceRow): ComposerResourceRecord {
