@@ -19,8 +19,8 @@ use windows_sys::{
         Foundation::{OBJ_CASE_INSENSITIVE, OBJ_DONT_REPARSE, UNICODE_STRING},
         Storage::FileSystem::{
             FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT, FILE_ATTRIBUTE_TAG_INFO,
-            FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_LIST_DIRECTORY,
-            FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_SHARE_WRITE, FileAttributeTagInfo,
+            FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_TRAVERSE, FileAttributeTagInfo,
             GetFileInformationByHandleEx, READ_CONTROL, SYNCHRONIZE,
         },
         System::{IO::IO_STATUS_BLOCK, WindowsProgramming::FILE_CREATED},
@@ -47,9 +47,16 @@ pub(super) fn ensure(paths: &[String]) -> Result<(), DirectoryFailure> {
                 DirectoryFailure::new(DirectoryError::Failed, DirectoryOperation::OpenDirectory)
                     .at_directory(directory_index)
             })?;
-            let (child, created) = open_child(parent, part, &security)
+            let private = index + 1 == parts.len();
+            let (child, created) = open_child(parent, part, &security, private)
                 .map_err(|error| error.at_directory(directory_index))?;
-            if created || index + 1 == parts.len() {
+            if created && !private {
+                let (checked, _) = open_child(parent, part, &security, true)
+                    .map_err(|error| error.at_directory(directory_index))?;
+                security
+                    .validate(&checked)
+                    .map_err(|error| error.at_directory(directory_index))?;
+            } else if private {
                 security
                     .validate(&child)
                     .map_err(|error| error.at_directory(directory_index))?;
@@ -62,7 +69,7 @@ pub(super) fn ensure(paths: &[String]) -> Result<(), DirectoryFailure> {
 
 fn open_root(path: &str) -> Result<File, DirectoryFailure> {
     let root = OpenOptions::new()
-        .access_mode(FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | SYNCHRONIZE)
+        .access_mode(FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE)
         .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
         .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
         .open(path)
@@ -75,6 +82,7 @@ fn open_child(
     parent: &File,
     name: &str,
     security: &PrivateSecurity,
+    private: bool,
 ) -> Result<(File, bool), DirectoryFailure> {
     let mut name: Vec<u16> = name.encode_utf16().collect();
     let len = u16::try_from(name.len() * 2).map_err(|_| {
@@ -99,7 +107,10 @@ fn open_child(
     let result = unsafe {
         NtCreateFile(
             &mut handle,
-            FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | READ_CONTROL | SYNCHRONIZE,
+            FILE_READ_ATTRIBUTES
+                | FILE_TRAVERSE
+                | SYNCHRONIZE
+                | if private { READ_CONTROL } else { 0 },
             &attributes,
             &mut status,
             ptr::null(),

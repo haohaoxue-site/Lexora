@@ -2,8 +2,8 @@ import { z } from 'zod'
 
 export const desktopBootstrapFailureSchema = z.object({
   kind: z.literal('desktop_bootstrap'),
-  operation: z.enum(['resolve_paths', 'create_directory', 'configure_paths', 'crash_reporter', 'register_protocols', 'desktop_identity']),
-  directoryRole: z.enum(['crash_dumps', 'session_data', 'user_data', 'window_state']).optional(),
+  operation: z.enum(['resolve_paths', 'create_directory', 'probe_directory', 'configure_paths', 'crash_reporter', 'register_protocols', 'desktop_identity']),
+  directoryRole: z.enum(['lexora_home', 'crash_dumps', 'session_data', 'user_data', 'window_state']).optional(),
   systemCode: z.enum(['EACCES', 'EPERM', 'ENOENT', 'EEXIST', 'ENOTDIR', 'ENOSPC', 'EIO', 'EMFILE', 'ENFILE', 'EROFS']).optional(),
 }).strict()
 

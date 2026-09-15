@@ -9,7 +9,7 @@ describe('startup failure presentation', () => {
     const options = describeDesktopStartupFailure(error, 'zh-CN', 'launch-fixture')
     expect(options.detail).toContain('访问权限不符合要求')
     expect(options.detail).toContain('诊断编号: launch-fixture')
-    expect(options.buttons).toEqual(['重新启动', '打开日志目录', '退出'])
+    expect(options.buttons).toEqual(['重新检查并启动', '打开日志目录', '退出'])
     expect(options.cancelId).toBe(2)
     expect(options.detail).toContain('数据没有被重置')
   })

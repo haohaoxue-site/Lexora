@@ -86,6 +86,9 @@ fn metadata_grants_do_not_hide_data_access_changes_or_unknown_rights() {
             continue;
         }
         for flags in ["", "OICIIO"] {
+            if access == FILE_TRAVERSE && flags.is_empty() {
+                continue;
+            }
             let mask = access | METADATA_READ_ACCESS;
             let sddl = format!("O:SYD:P(A;OICI;FA;;;SY)(A;{flags};{mask:#x};;;WD)");
             assert_eq!(
@@ -101,6 +104,29 @@ fn metadata_grants_do_not_hide_data_access_changes_or_unknown_rights() {
                 "{sddl}"
             );
         }
+    }
+}
+
+#[test]
+fn traverse_grants_are_allowed_only_when_they_cannot_be_inherited_by_files() {
+    let security = PrivateSecurity::new().unwrap();
+    for flags in ["", "CI", "CIIO", "CIID"] {
+        let sddl = format!("O:SYD:P(A;{flags};0x1200a0;;;WD)");
+        assert_eq!(
+            security.validate_descriptor(&from_sddl(&sddl).unwrap()),
+            Ok(()),
+            "{sddl}"
+        );
+    }
+    for flags in ["OI", "OICI", "OICIIO", "OICIID"] {
+        let sddl = format!("O:SYD:P(A;{flags};0x1200a0;;;WD)");
+        let failure = security
+            .validate_descriptor(&from_sddl(&sddl).unwrap())
+            .unwrap_err();
+        assert_eq!(
+            failure.acl.unwrap().reason,
+            DirectoryAclReason::UntrustedAccess
+        );
     }
 }
 

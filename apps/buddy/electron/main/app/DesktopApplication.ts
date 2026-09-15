@@ -13,7 +13,7 @@ import { readPreviousLaunchId } from './desktopRecovery'
 import { DesktopRuntimeHost } from './DesktopRuntimeHost'
 import { checkDesktopSmokeBridge } from './desktopSmokeCheck'
 import { DesktopWindowHost } from './DesktopWindowHost'
-import { initializeDesktopEnvironment, prepareDesktopEnvironment, prepareDesktopReady } from './environment'
+import { checkDesktopCoreDirectories, initializeDesktopEnvironment, prepareDesktopEnvironment, prepareDesktopReady } from './environment'
 
 class DesktopApplication {
   readonly #environment: DesktopEnvironment
@@ -122,7 +122,7 @@ class DesktopApplication {
     finally {
       try {
         if (!this.#environment.isSmokeTest)
-          await showDesktopStartupFailure(error, this.#runtime.language, this.#environment)
+          await showDesktopStartupFailure(error, this.#runtime.language, this.#environment, () => prepareDesktopReady(this.#environment))
       }
       finally {
         try {
@@ -161,14 +161,17 @@ class DesktopApplication {
   }
 }
 
-export function startDesktopApplication(): void {
+export async function startDesktopApplication(): Promise<void> {
   let environment: DesktopEnvironment | undefined
   let recoveryRecorded = false
   try {
     environment = prepareDesktopEnvironment()
     initializeDesktopEnvironment(environment)
     if (!app.requestSingleInstanceLock()) {
-      void environment.diagnostics.close().finally(() => app.quit())
+      environment.diagnostics.record({ scope: 'desktop', level: 'info', event: 'startup.single_instance_lock_unavailable' })
+      await checkDesktopCoreDirectories(environment)
+      await environment.diagnostics.close()
+      app.quit()
       return
     }
     environment.events.publish({ level: 'info', event: 'app.starting' })
@@ -186,7 +189,8 @@ export function startDesktopApplication(): void {
     if (previousLaunchId && !recoveryRecorded)
       environment?.events.publish({ level: 'info', event: 'app.recovery_started', previousLaunchId })
     environment?.startup.failed(error)
-    void showDesktopStartupFailure(error, 'zh-CN', environment).finally(async () => {
+    const failedEnvironment = environment
+    void showDesktopStartupFailure(error, 'zh-CN', environment, failedEnvironment ? () => prepareDesktopReady(failedEnvironment) : undefined).finally(async () => {
       try {
         await environment?.diagnostics.close()
       }

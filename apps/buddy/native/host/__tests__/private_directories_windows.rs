@@ -60,9 +60,10 @@ fn open_parent_handle_prevents_renaming_the_directory_chain() {
     let parent_path = fixture.0.join("parent");
     let root = open_root(fixture.0.to_str().unwrap()).unwrap();
     let security = PrivateSecurity::new().unwrap();
-    let (parent, _) = open_child(&root, "parent", &security).unwrap();
+    let (parent, _) = open_child(&root, "parent", &security, false).unwrap();
     assert!(fs::rename(&parent_path, fixture.0.join("moved")).is_err());
-    let (child, created) = open_child(&parent, "child", &security).unwrap();
+    let (child, created) = open_child(&parent, "child", &security, true).unwrap();
     assert!(created);
     security.validate(&child).unwrap();
+    assert!(fs::rename(parent_path.join("child"), parent_path.join("moved-child")).is_err());
 }

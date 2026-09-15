@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { access, mkdir, mkdtemp, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readdir, readFile, rm, symlink, unlink, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, parse, resolve } from 'node:path'
 import process from 'node:process'
 import { PrivateDirectoryError } from '../../windows/privateDirectories'
 import { readBoundedFile } from '../boundedFile'
 import { ensurePrivateDirectories } from '../privateDirectories'
-import { inspectWindowsPrivateDirectory as inspect } from './windowsPrivateDirectoryFixture'
+import { inspectWindowsPrivateDirectory as inspect, setWindowsPrivateDirectoryAcl } from './windowsPrivateDirectoryFixture'
 
 assert.equal(process.platform, 'win32')
 const [helperArgument, resultPath] = process.argv.slice(2)
@@ -61,6 +61,8 @@ try {
     ['users-attributes', '(A;;0x80;;;BU)'],
     ['everyone-metadata', '(A;OICI;0x120080;;;WD)'],
     ['app-packages-metadata', '(A;OICIIO;0x120080;;;AC)'],
+    ['everyone-traverse', '(A;;0x20;;;WD)'],
+    ['directory-traverse', '(A;CI;0x1200a0;;;BU)'],
   ]) {
     const path = join(directory, name!)
     await ensurePrivateDirectories([path], helper)
@@ -72,7 +74,36 @@ try {
     assert.equal(inspect(path).sddl, before.sddl)
     assert.equal(await readFile(sentinel, 'utf8'), 'existing-user-data')
   }
-  checks.push('metadata-only grants are accepted without changing ACLs or existing files')
+  checks.push('metadata-only and directory-only traverse grants are accepted without changing ACLs or existing files')
+
+  for (const [name, grant] of [
+    ['file-execute-inheritance', '(A;OICI;0x20;;;WD)'],
+    ['unknown-capability', '(A;OICI;FA;;;S-1-15-3-1024-1-2-3-4-5-6-7-8)'],
+    ['attributes-and-content', '(A;;0x81;;;BU)'],
+  ]) {
+    const path = join(directory, name!)
+    await ensurePrivateDirectories([path], helper)
+    const before = inspect(path, `O:CURRENTD:P(A;OICI;FA;;;CURRENT)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)${grant}`)
+    await assert.rejects(ensurePrivateDirectories([path], helper), { code: 'PRIVATE_DIRECTORIES_UNSAFE' })
+    assert.equal(inspect(path).sddl, before.sddl)
+  }
+  checks.push('file-execute inheritance, unknown capability grants and 0x81 content access remain blocked')
+
+  const restrictedParent = join(directory, 'restricted-parent')
+  const accessibleChild = join(restrictedParent, 'private')
+  await ensurePrivateDirectories([accessibleChild], helper)
+  const parentBefore = inspect(restrictedParent, 'O:CURRENTD:P(A;OICI;FA;;;CURRENT)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)')
+  try {
+    setWindowsPrivateDirectoryAcl(restrictedParent, 'O:CURRENTD:P(D;;0x20000;;;OW)(D;;0x1;;;CURRENT)(A;;FA;;;CURRENT)(A;;FA;;;SY)(A;;FA;;;BA)')
+    await assert.rejects(ensurePrivateDirectories([restrictedParent], helper), (error: unknown) => error instanceof PrivateDirectoryError && error.failure.operation === 'open_directory' && error.failure.systemError?.code === 0xC0000022)
+    await assert.rejects(readdir(restrictedParent))
+    await ensurePrivateDirectories([accessibleChild], helper)
+    checks.push('private child validation does not require listing or READ_CONTROL on existing parent directories')
+  }
+  finally {
+    setWindowsPrivateDirectoryAcl(restrictedParent, parentBefore.sddl)
+    assert.equal(inspect(restrictedParent).sddl.replace('D:PAI', 'D:P'), parentBefore.sddl.replace('D:PAI', 'D:P'))
+  }
 
   const insecure = join(directory, 'insecure')
   await ensurePrivateDirectories([insecure], helper)
