@@ -42,7 +42,7 @@ const toggleDisabled = computed(() => props.busy || (props.inSpace && !props.ski
       <NTag v-if="skill.status === 'manual_only' || skill.status === 'invalid'" size="small" :bordered="false" :type="skill.status === 'invalid' ? 'warning' : 'default'">
         {{ t(`desktop.skills.status.${skill.status}`) }}
       </NTag>
-      <NSwitch v-if="skill.managedBy !== 'directory'" size="small" :value="skill.enabled" :disabled="toggleDisabled" :aria-disabled="toggleDisabled" :aria-label="t('desktop.skills.toggle', { name: skill.name })" @update:value="$emit('enable', skill, $event)" />
+      <NSwitch v-if="skill.managedBy !== 'directory'" :round="false" size="small" :value="skill.enabled" :disabled="toggleDisabled" :aria-disabled="toggleDisabled" :aria-label="t('desktop.skills.toggle', { name: skill.name })" @update:value="$emit('enable', skill, $event)" />
       <NTooltip v-if="overriddenBy">
         <template #trigger>
           <button class="skill-row__override" type="button" :aria-label="overrideHint" @click="$emit('locate', overriddenBy)">

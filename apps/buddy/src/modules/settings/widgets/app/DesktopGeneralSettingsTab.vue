@@ -115,6 +115,7 @@ async function updateWelcomePreference(preference: DesktopChatWelcomePreference)
           </div>
           <div class="desktop-settings-row__control is-compact">
             <NSwitch
+              :round="false"
               :value="config.desktop.launchAtLogin"
               @update:value="updateSetting('autostart', { desktop: { launchAtLogin: $event } })"
             />
@@ -131,6 +132,7 @@ async function updateWelcomePreference(preference: DesktopChatWelcomePreference)
           </div>
           <div class="desktop-settings-row__control is-compact">
             <NSwitch
+              :round="false"
               :value="config.desktop.developerToolsEnabled"
               @update:value="updateSetting('developerTools', { desktop: { developerToolsEnabled: $event } })"
             />

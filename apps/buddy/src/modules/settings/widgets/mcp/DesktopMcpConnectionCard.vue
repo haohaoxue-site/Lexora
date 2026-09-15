@@ -27,7 +27,7 @@ const cachedTools = computed(() => props.connector.runtime.updatedAt !== null &&
           {{ t(`desktop.mcp.status.${connector.runtime.status}`) }}
         </NTag>
       </div>
-      <NSwitch :value="connector.enabled" :disabled="busy" :aria-label="`${t('desktop.mcp.enabled')}: ${connector.name}`" @update:value="emit('toggle', $event)" />
+      <NSwitch :round="false" :value="connector.enabled" :disabled="busy" :aria-label="`${t('desktop.mcp.enabled')}: ${connector.name}`" @update:value="emit('toggle', $event)" />
     </header>
     <p class="mcp-connection__target" :title="target">
       {{ target }}

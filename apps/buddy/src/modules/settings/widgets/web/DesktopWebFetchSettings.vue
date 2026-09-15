@@ -35,14 +35,14 @@ const { t } = useBuddyI18n(() => props.language)
             <strong id="web-fetch-render">{{ t('desktop.web.render') }}</strong>
             <p>{{ t('desktop.web.renderDescription') }}</p>
           </div>
-          <NSwitch aria-labelledby="web-fetch-render" :value="settings.render" :disabled="disabled" @update:value="emit('toggle', 'render', $event)" />
+          <NSwitch :round="false" aria-labelledby="web-fetch-render" :value="settings.render" :disabled="disabled" @update:value="emit('toggle', 'render', $event)" />
         </div>
         <div class="desktop-web-fetch__row">
           <div class="desktop-web-fetch__copy">
             <strong id="web-fetch-remote">{{ t('desktop.web.remote') }}</strong>
             <p>{{ t(tavilyKeyConfigured ? 'desktop.web.remoteDescription' : 'desktop.web.remoteUnavailable') }}</p>
           </div>
-          <NSwitch aria-labelledby="web-fetch-remote" :value="tavilyKeyConfigured && settings.remote" :disabled="disabled || !tavilyKeyConfigured" @update:value="emit('toggle', 'remote', $event)" />
+          <NSwitch :round="false" aria-labelledby="web-fetch-remote" :value="tavilyKeyConfigured && settings.remote" :disabled="disabled || !tavilyKeyConfigured" @update:value="emit('toggle', 'remote', $event)" />
         </div>
       </div>
     </section>

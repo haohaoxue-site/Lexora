@@ -113,6 +113,7 @@ function providerAuthenticationLabel(type: NonNullable<LocalProvider['storedCred
               {{ t('desktop.providers.manage') }}
             </NButton>
             <NSwitch
+              :round="false"
               :value="provider.enabled"
               :disabled="provider.activeRunCount > 0"
               @update:value="providerSettings.setProviderEnabled(provider.id, $event)"
