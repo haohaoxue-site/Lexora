@@ -1,19 +1,26 @@
 <script setup lang="ts">
 import type { LocalArtifact, LocalArtifactText } from '@buddy-shared/artifacts/artifactApi'
-
+import type { ArtifactViewMode } from './taskContextPanel'
 import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { NSpin } from 'naive-ui'
+import { computed } from 'vue'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { FileIcon, FolderIcon } from '@/shared/ui/file-icon'
+import DesktopMonacoFile from '@/shared/ui/files/DesktopMonacoFile.vue'
+import DesktopMarkdownContent from '@/shared/ui/markdown/DesktopMarkdownContent.vue'
 import BuddyImagePreview from '@/shared/ui/media/BuddyImagePreview.vue'
+import { isMarkdownArtifact } from './artifactContextPresentation'
 import { useArtifactPreview } from './useArtifactPreview'
 
 const props = defineProps<{
   artifact: LocalArtifact
   language: BuddyLocale
+  viewMode: ArtifactViewMode
   readArtifactText: (artifactId: string) => Promise<LocalArtifactText>
+  writeClipboardText: (text: string) => Promise<void>
 }>()
 
+const markdown = computed(() => isMarkdownArtifact(props.artifact))
 const { t } = useBuddyI18n(() => props.language)
 const { failImage, openPreview, previewIndex, previewOpen, previewSources, previewUrl, textPreview, textPreviewFailed, textPreviewLoading } = useArtifactPreview({
   artifact: () => props.artifact,
@@ -30,7 +37,7 @@ const { failImage, openPreview, previewIndex, previewOpen, previewSources, previ
       :sources="previewSources"
     />
 
-    <div class="desktop-artifact-context-surface__viewport">
+    <div class="desktop-artifact-context-surface__viewport" :class="{ 'desktop-artifact-context-surface__viewport--document': markdown && textPreview }">
       <button
         v-if="previewUrl"
         class="desktop-artifact-context-surface__preview-trigger"
@@ -49,6 +56,14 @@ const { failImage, openPreview, previewIndex, previewOpen, previewSources, previ
         <NSpin size="small" />
         <span>{{ t('common.loading') }}</span>
       </div>
+      <article v-else-if="markdown && textPreview && viewMode === 'preview'" class="desktop-artifact-context-surface__markdown">
+        <DesktopMarkdownContent :content="textPreview.text" code-overflow="scroll" :language="language" :write-clipboard-text="writeClipboardText" />
+      </article>
+      <DesktopMonacoFile v-else-if="markdown && textPreview" :text="textPreview.text" :path="artifact.path" :wrap="true">
+        <template #error>
+          {{ t('desktop.context.sourceLoadFailed') }}
+        </template>
+      </DesktopMonacoFile>
       <pre
         v-else-if="textPreview"
         class="desktop-artifact-context-surface__text"
@@ -88,6 +103,25 @@ const { failImage, openPreview, previewIndex, previewOpen, previewSources, previ
   background: var(--buddy-surface-subtle);
   padding: 1rem;
   place-items: center;
+}
+
+.desktop-artifact-context-surface__viewport--document {
+  display: block;
+  overflow: hidden;
+  background: var(--buddy-surface-base);
+  padding: 0;
+}
+
+.desktop-artifact-context-surface__markdown {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  padding: 1.25rem 1.5rem 2rem;
+  color: var(--buddy-text-primary);
+  font-family: var(--buddy-font-ui);
+  overflow-wrap: anywhere;
+  --buddy-chat-final-font-size: 0.875rem;
+  --buddy-chat-final-line-height: 1.75;
 }
 
 .desktop-artifact-context-surface__preview-trigger {

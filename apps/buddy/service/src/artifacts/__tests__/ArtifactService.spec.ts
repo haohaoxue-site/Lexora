@@ -57,6 +57,25 @@ describe('artifactService', () => {
     expect(fixture.service.listConversationArtifacts('conversation-1')).toHaveLength(2)
   })
 
+  it.each(['report.md', 'REPORT.MD', 'report.markdown'])('reads %s as Markdown without changing the file', async (name) => {
+    const fixture = await createFixture()
+    const path = join(fixture.workspace, name)
+    const text = '# Route plan\n\n| Stop | Distance |\n| --- | --- |\n| Riverside | 20 km |\n'
+    await writeFile(path, text)
+    const [artifact] = await fixture.service.presentOutputs({
+      conversationId: 'conversation-1',
+      cwd: fixture.workspace,
+      grants: fixture.grants,
+      paths: [path],
+    })
+    expect(artifact!.mimeType).toBe('text/markdown')
+    await expect(fixture.service.readText(artifact!.id)).resolves.toEqual({ artifactId: artifact!.id, language: 'markdown', text })
+    fixture.database.prepare('UPDATE artifacts SET mime_type = ? WHERE id = ?').run('application/octet-stream', artifact!.id)
+    await expect(fixture.service.readText(artifact!.id)).resolves.toEqual({ artifactId: artifact!.id, language: 'markdown', text })
+    expect(fixture.repository.findVisibleById(artifact!.id)?.mimeType).toBe('application/octet-stream')
+    await expect(readFile(path, 'utf8')).resolves.toBe(text)
+  })
+
   it('rejects an output outside the granted directories', async () => {
     const fixture = await createFixture()
     const sourcePath = join(fixture.root, 'outside.svg')

@@ -1,6 +1,6 @@
 import type { LocalRunEvent } from '@buddy-shared/runs/runApi'
 
-import type { TaskContextTab } from './taskContextPanel'
+import type { ArtifactViewMode, TaskContextTab } from './taskContextPanel'
 import type { UseTaskContextPanelOptions } from './typing'
 import { computed, readonly, shallowRef, watch } from 'vue'
 import { resolveChatToolFileTarget } from '../../model/transcript/chatToolFileTarget'
@@ -81,10 +81,19 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
 
   function openArtifact(artifactId: string) {
     const tabId = artifactTabId(artifactId)
-    const tab = availableArtifacts.value.find(tab => tab.id === tabId)
-      ?? tabs.value.find(tab => tab.id === tabId)
-    if (tab)
-      openTab(tab)
+    const existing = tabs.value.find(tab => tab.id === tabId)
+    const tab = availableArtifacts.value.find(tab => tab.id === tabId) ?? existing
+    if (tab) {
+      openTab(tab.kind === 'artifact' && existing?.kind === 'artifact'
+        ? { ...tab, viewMode: existing.viewMode }
+        : tab)
+    }
+  }
+
+  function setArtifactViewMode(tabId: string, viewMode: ArtifactViewMode) {
+    resourceTabs.value = resourceTabs.value.map(tab => tab.id === tabId && tab.kind === 'artifact'
+      ? { ...tab, viewMode }
+      : tab)
   }
 
   function openBrowser() {
@@ -234,6 +243,7 @@ export function useTaskContextPanel(options: UseTaskContextPanelOptions) {
     openFiles,
     previewFile,
     selectFile,
+    setArtifactViewMode,
     restoreTab,
     selectTab,
     tabs: readonly(tabs),

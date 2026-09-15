@@ -3,11 +3,14 @@ import type { LocalChangeSetSummary } from '@buddy-shared/changes/changeApi'
 import type { LocalRunOutput } from '@buddy-shared/runs/runApi'
 import type { SpaceFileTarget } from '@buddy-shared/spaces/spaceFileApi'
 
+export type ArtifactViewMode = 'preview' | 'source'
+
 export interface TaskArtifactContextTab {
   artifact: LocalArtifact
   id: string
   kind: 'artifact'
   label: string
+  viewMode: ArtifactViewMode
 }
 
 export interface TaskChangesContextTab {
@@ -57,6 +60,7 @@ export function spaceTaskArtifactTabs(
     id: artifactTabId(artifact.artifactId),
     kind: 'artifact',
     label: artifact.name,
+    viewMode: 'preview',
   }))
 }
 

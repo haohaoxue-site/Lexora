@@ -9,6 +9,7 @@ import 'markstream-vue/index.css'
 
 const props = withDefaults(defineProps<{
   content: string
+  codeOverflow?: 'wrap' | 'scroll'
   final?: boolean
   language: BuddyLocale
   writeClipboardText: (text: string) => Promise<void>
@@ -46,7 +47,7 @@ async function copyCodeBlock(event: MouseEvent) {
 
   const button = event.target.closest<HTMLButtonElement>('.code-block-header .code-action-btn')
   const codeBlock = button?.closest<HTMLElement>('.code-block-container')
-  const code = codeBlock?.querySelector<HTMLElement>('pre.code-pre-fallback')
+  const code = codeBlock?.querySelector<HTMLElement>('pre.code-pre-fallback > code')
   if (!button || !code)
     return
 
@@ -101,6 +102,7 @@ onBeforeUnmount(() => {
       class="buddy-chat-markdown"
       :batch-rendering="animateStreaming"
       :content="content"
+      :code-block-options="codeOverflow ? { overflow: codeOverflow } : undefined"
       :fade="false"
       :final="final"
       html-policy="escape"
