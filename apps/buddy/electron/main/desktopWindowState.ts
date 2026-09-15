@@ -16,16 +16,18 @@ export type DesktopWindowPlacement = z.infer<typeof windowPlacementSchema>
 export type DesktopDisplayBounds = Omit<DesktopWindowPlacement, 'maximized'>
 
 export class DesktopWindowStateStore {
-  readonly #path: string
+  readonly #path: string | null
   readonly #onError: (operation: 'read' | 'write', error: unknown) => void
   #writeQueue: Promise<void> = Promise.resolve()
 
-  constructor(options: { path: string, onError: (operation: 'read' | 'write', error: unknown) => void }) {
+  constructor(options: { path: string | null, onError: (operation: 'read' | 'write', error: unknown) => void }) {
     this.#path = options.path
     this.#onError = options.onError
   }
 
   async read(): Promise<DesktopWindowPlacement | null> {
+    if (!this.#path)
+      return null
     try {
       return windowPlacementSchema.parse(JSON.parse(await readFile(this.#path, 'utf8')))
     }
@@ -40,10 +42,13 @@ export class DesktopWindowStateStore {
   }
 
   write(placement: DesktopWindowPlacement): Promise<void> {
+    const path = this.#path
+    if (!path)
+      return Promise.resolve()
     const validated = windowPlacementSchema.parse(placement)
     const operation = this.#writeQueue.then(async () => {
-      const parent = dirname(this.#path)
-      const temporaryPath = `${this.#path}.${process.pid}.${randomUUID()}.tmp`
+      const parent = dirname(path)
+      const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`
       await mkdir(parent, { mode: 0o700, recursive: true })
       try {
         const handle = await open(temporaryPath, 'wx', 0o600)
@@ -54,8 +59,8 @@ export class DesktopWindowStateStore {
         finally {
           await handle.close()
         }
-        await rename(temporaryPath, this.#path)
-        await chmod(this.#path, 0o600)
+        await rename(temporaryPath, path)
+        await chmod(path, 0o600)
       }
       finally {
         await rm(temporaryPath, { force: true })

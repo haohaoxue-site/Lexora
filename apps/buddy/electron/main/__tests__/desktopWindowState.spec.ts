@@ -8,6 +8,13 @@ import {
 } from '../desktopWindowState'
 
 describe('desktop window state', () => {
+  it('uses default placement and skips persistence when optional storage is unavailable', async () => {
+    const failures: unknown[] = []
+    const store = new DesktopWindowStateStore({ path: null, onError: error => failures.push(error) })
+    await expect(store.read()).resolves.toBeNull()
+    await expect(store.write({ height: 820, width: 1280, maximized: false, x: 40, y: 60 })).resolves.toBeUndefined()
+    expect(failures).toEqual([])
+  })
   it('restores only placements that still intersect a display', () => {
     const displays = [{ height: 1080, width: 1920, x: 0, y: 0 }]
     expect(resolveVisibleWindowPlacement({

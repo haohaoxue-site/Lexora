@@ -6,12 +6,11 @@ import process from 'node:process'
 import { app, crashReporter, Menu } from 'electron'
 import buddyPackage from '../../../package.json'
 import { currentPlatform } from '../../../platform/currentPlatform'
-import { ensurePrivateDirectories } from '../../../platform/filesystem/privateDirectories'
 import { resolveBuddyPrivateDirectories } from '../../../platform/native/nativeHost'
-import { PrivateDirectoryError } from '../../../platform/windows/privateDirectories'
 import developmentDesktopIconPath from '../../../resources/icons/app-icon-dev.png?asset'
 import stableDesktopIconPath from '../../../resources/icons/app-icon.png?asset'
 import developmentTrayIconPath from '../../../resources/icons/tray-icon-dev.png?asset'
+import { readDiagnosticError } from '../../../shared/diagnostics/applicationDiagnostic'
 import { ApplicationEvents } from '../../../shared/observability/ApplicationEvents'
 import { registerAttachmentSchemePrivileges } from '../attachmentProtocol'
 import { DesktopDiagnosticLogger } from '../desktopDiagnostics'
@@ -21,6 +20,7 @@ import { registerRendererSchemePrivileges } from '../rendererProtocol'
 import { resolveDesktopLaunchIntent } from '../startupIntent'
 import { bootstrapStep } from './desktopBootstrap'
 import { DesktopStartup } from './DesktopStartup'
+import { checkDesktopDirectories, criticalDesktopDirectories } from './desktopStorage'
 
 export function prepareDesktopEnvironment(): DesktopEnvironment {
   const desktopHost = desktopHosts[currentPlatform.id]
@@ -63,6 +63,7 @@ export function prepareDesktopEnvironment(): DesktopEnvironment {
     initialLaunchIntent: resolveDesktopLaunchIntent(process.argv),
     isSmokeTest,
     paths,
+    windowStateAvailable: true,
     setAutostart: desktopHost.setAutostart,
     trayIconPath: paths.iconVariant === 'development' ? developmentTrayIconPath : stableDesktopIconPath,
   }
@@ -71,22 +72,35 @@ export function prepareDesktopEnvironment(): DesktopEnvironment {
 export function initializeDesktopEnvironment(environment: DesktopEnvironment): void {
   const { paths } = environment
   const directories = {
-    crash_dumps: paths.crashDumps,
     session_data: paths.sessionData,
     user_data: paths.userData,
-    window_state: dirname(paths.windowState),
   } as const
   for (const [role, directory] of Object.entries(directories)) {
     bootstrapStep('create_directory', () => mkdirSync(directory, { mode: 0o700, recursive: true }), role as keyof typeof directories)
+  }
+  let crashDumpsAvailable = false
+  try {
+    bootstrapStep('create_directory', () => mkdirSync(paths.crashDumps, { mode: 0o700, recursive: true }), 'crash_dumps')
+    bootstrapStep('configure_paths', () => app.setPath('crashDumps', paths.crashDumps), 'crash_dumps')
+    crashDumpsAvailable = true
+  }
+  catch (error) {
+    environment.diagnostics.record({ scope: 'desktop', level: 'warn', event: 'crash_reporter.unavailable', ...readDiagnosticError(error) })
   }
   bootstrapStep('configure_paths', () => {
     app.setName(paths.appName)
     app.setPath('userData', paths.userData)
     app.setPath('sessionData', paths.sessionData)
-    app.setPath('crashDumps', paths.crashDumps)
     app.setAppLogsPath(paths.logs)
   })
-  bootstrapStep('crash_reporter', () => crashReporter.start({ productName: paths.appName, uploadToServer: false }))
+  if (crashDumpsAvailable) {
+    try {
+      bootstrapStep('crash_reporter', () => crashReporter.start({ productName: paths.appName, uploadToServer: false }))
+    }
+    catch (error) {
+      environment.diagnostics.record({ scope: 'desktop', level: 'warn', event: 'crash_reporter.unavailable', ...readDiagnosticError(error) })
+    }
+  }
   bootstrapStep('register_protocols', () => {
     registerAttachmentSchemePrivileges()
     registerRendererSchemePrivileges()
@@ -94,29 +108,28 @@ export function initializeDesktopEnvironment(environment: DesktopEnvironment): v
   bootstrapStep('desktop_identity', () => desktopHosts[currentPlatform.id].setIdentity(paths.desktopName))
 }
 
+function privateDirectoriesExecutable(): string | undefined {
+  return resolveBuddyPrivateDirectories({
+    appPath: app.getAppPath(),
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+  })
+}
+
+export function checkDesktopCoreDirectories(environment: DesktopEnvironment): Promise<void> {
+  return checkDesktopDirectories(criticalDesktopDirectories(environment.paths), privateDirectoriesExecutable())
+}
+
 export async function prepareDesktopReady(environment: DesktopEnvironment): Promise<void> {
   const { paths } = environment
-  const directories = {
-    lexora_home: paths.lexoraHome,
-    user_data: paths.userData,
-    session_data: paths.sessionData,
-    window_state: dirname(paths.windowState),
-  } as const
-  const entries = Object.entries(directories).filter(([, path], index, all) => all.findIndex(([, candidate]) => candidate === path) === index)
+  await checkDesktopCoreDirectories(environment)
   try {
-    await ensurePrivateDirectories(entries.map(([, path]) => path), resolveBuddyPrivateDirectories({
-      appPath: app.getAppPath(),
-      isPackaged: app.isPackaged,
-      resourcesPath: process.resourcesPath,
-    }))
+    await checkDesktopDirectories({ window_state: dirname(paths.windowState) }, privateDirectoriesExecutable())
+    environment.windowStateAvailable = true
   }
   catch (error) {
-    if (error instanceof PrivateDirectoryError && error.failure.directoryIndex !== undefined) {
-      const role = entries[error.failure.directoryIndex]?.[0] as keyof typeof directories | undefined
-      if (role)
-        error.failure.directoryRole = role
-    }
-    throw error
+    environment.windowStateAvailable = false
+    environment.diagnostics.record({ scope: 'desktop', level: 'warn', event: 'window_state.unavailable', ...readDiagnosticError(error) })
   }
   app.setAppUserModelId(paths.desktopName)
   Menu.setApplicationMenu(null)

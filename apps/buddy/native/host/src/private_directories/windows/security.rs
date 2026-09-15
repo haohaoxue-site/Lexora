@@ -9,11 +9,12 @@ use windows_sys::Win32::{
             GetSecurityInfo, SDDL_REVISION_1, SE_FILE_OBJECT,
         },
         DACL_SECURITY_INFORMATION, GetAce, GetSecurityDescriptorDacl, GetSecurityDescriptorOwner,
-        INHERIT_ONLY_ACE, IsValidAcl, OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
-        WinAuthenticatedUserSid, WinBuiltinAdministratorsSid, WinBuiltinAnyPackageSid,
-        WinBuiltinUsersSid, WinCreatorOwnerSid, WinLocalSystemSid, WinWorldSid,
+        INHERIT_ONLY_ACE, IsValidAcl, OBJECT_INHERIT_ACE, OWNER_SECURITY_INFORMATION,
+        PSECURITY_DESCRIPTOR, WinAuthenticatedUserSid, WinBuiltinAdministratorsSid,
+        WinBuiltinAnyPackageSid, WinBuiltinUsersSid, WinCreatorOwnerSid, WinLocalSystemSid,
+        WinWorldSid,
     },
-    Storage::FileSystem::{FILE_READ_ATTRIBUTES, READ_CONTROL, SYNCHRONIZE},
+    Storage::FileSystem::{FILE_READ_ATTRIBUTES, FILE_TRAVERSE, READ_CONTROL, SYNCHRONIZE},
     System::{
         SystemServices::{ACCESS_ALLOWED_ACE_TYPE, ACCESS_DENIED_ACE_TYPE},
         Threading::GetCurrentProcess,
@@ -242,7 +243,10 @@ impl PrivateSecurity {
                         && sid == self.creator_owner;
                     // SAFETY: The validated standard allow ACE includes its fixed access mask.
                     let mask = unsafe { (*ace.cast::<ACCESS_ALLOWED_ACE>()).Mask };
-                    let metadata_only = mask & !METADATA_READ_ACCESS == 0;
+                    let directory_only = u32::from(header.AceFlags) & OBJECT_INHERIT_ACE == 0;
+                    let harmless_access =
+                        METADATA_READ_ACCESS | if directory_only { FILE_TRAVERSE } else { 0 };
+                    let metadata_only = mask & !harmless_access == 0;
                     if !self.trusted.contains(&sid) && !owner_template && !metadata_only {
                         return Err(DirectoryFailure::acl(DirectoryAclFailure {
                             access_mask: Some(mask),

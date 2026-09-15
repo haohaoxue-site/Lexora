@@ -22,6 +22,10 @@ const native = vi.hoisted(() => ({
   relaunchArgs: [] as string[],
 }))
 
+vi.mock('../DesktopRecoveryWindow', () => ({ showRecoveryWindow: async () => {
+  throw new Error('Renderer unavailable fixture')
+} }))
+
 vi.mock('electron', () => ({
   app: { isReady: () => native.ready, relaunch: ({ args }: { args: string[] }) => {
     if (native.relaunchError)
@@ -90,12 +94,12 @@ describe('startup recovery', () => {
     expect(native.effects).toEqual([`logs:${environment.paths.logs}`, `location:${paths.userData}`, 'restart'])
     expect(native.messages).toHaveLength(3)
     expect(native.messages[0]).toMatchObject({
-      buttons: ['重新启动', '打开日志目录', '打开问题目录所在位置', '退出'],
+      buttons: ['重新检查并启动', '打开日志目录', '打开问题目录所在位置', '退出'],
       cancelId: 3,
     })
     expect(native.messages[0]?.detail).toContain(`问题目录: ${paths.userData}`)
     expect(readPreviousLaunchId(native.relaunchArgs)).toBe(environment.diagnostics.launchId)
-    const records = await recoveryRecords()
+    const records = (await recoveryRecords()).filter(record => record.event !== 'startup.recovery.window_failed')
     expect(records.map(record => [record.event, record.recoveryAction])).toEqual([
       ['startup.recovery.presented', undefined],
       ['startup.recovery.action_requested', 'open_logs'],
@@ -157,5 +161,29 @@ describe('startup recovery', () => {
   it('does not derive a location from arbitrary error fields or a missing directory role', () => {
     expect(resolveStartupFailureDirectory({ directoryRole: 'user_data', path: '/untrusted' }, paths)).toBeUndefined()
     expect(resolveStartupFailureDirectory(new PrivateDirectoryError('PRIVATE_DIRECTORIES_UNSAFE', { kind: 'private_directories', operation: 'validate_acl' }), paths)).toBeUndefined()
+  })
+
+  it('does not restart after a failed recheck and preserves the structured cause until a later check succeeds', async () => {
+    native.responses = [0, 0, 0]
+    let checks = 0
+    const blocked = new DesktopBootstrapError({ kind: 'desktop_bootstrap', operation: 'probe_directory', directoryRole: 'user_data' }, Object.assign(new Error('fixture-private-path'), { code: 'EACCES' }))
+    await showDesktopStartupFailure(failure, 'zh-CN', environment, async () => {
+      expect(native.effects).toEqual([])
+      if (++checks === 1)
+        throw blocked
+    })
+    expect(checks).toBe(2)
+    expect(native.effects).toEqual(['restart'])
+    expect(native.messages[1]?.message).toContain('没有发起重启')
+    expect(native.messages[2]?.detail).toContain('probe_directory / user_data / EACCES')
+    const records = await recoveryRecords()
+    expect(records.filter(record => record.event.startsWith('startup.recovery.recheck')).map(record => record.event)).toEqual([
+      'startup.recovery.recheck_started',
+      'startup.recovery.recheck_failed',
+      'startup.recovery.recheck_started',
+      'startup.recovery.recheck_completed',
+    ])
+    expect(records.find(record => record.event === 'startup.recovery.recheck_failed')?.failure).toMatchObject(blocked.failure)
+    expect(JSON.stringify(records)).not.toContain('fixture-private')
   })
 })

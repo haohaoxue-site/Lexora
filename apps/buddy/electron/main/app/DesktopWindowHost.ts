@@ -63,7 +63,7 @@ export class DesktopWindowHost {
   async initialize(bindings: WindowBindings): Promise<BrowserWindow> {
     const environment = this.#environment
     const stateStore = new DesktopWindowStateStore({
-      path: environment.paths.windowState,
+      path: environment.windowStateAvailable ? environment.paths.windowState : null,
       onError: (operation, error) => {
         environment.diagnostics.record({ scope: 'desktop', level: 'warn', event: `window_state.${operation}.failed`, error })
       },

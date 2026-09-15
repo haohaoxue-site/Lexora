@@ -1,22 +1,32 @@
 import type { BrowserWindow, MessageBoxOptions } from 'electron'
 import type { LexoraConfig } from '../../shared/desktopApi'
 import type { LexoraConfigStore } from '../config/LexoraConfigStore'
+import type { RecoveryAction } from './desktopRecoveryPage'
+import type { RecoveryActionResult } from './DesktopRecoveryWindow'
 import type { DesktopEnvironment, DesktopQuitHost, DesktopQuitOptions } from './typing'
 import { randomUUID } from 'node:crypto'
 import process from 'node:process'
 import { app, dialog, ipcMain, Notification, shell } from 'electron'
+import { readDiagnosticError } from '../../../shared/diagnostics/applicationDiagnostic'
 import { translateDesktopNative } from '../desktopNativeI18n'
 import { confirmDraftFlushBeforeQuit, requestRendererDraftFlush } from '../rendererDraftLifecycle'
 import { recoveryRelaunchArgs } from './desktopRecovery'
+import { showRecoveryWindow } from './DesktopRecoveryWindow'
 import { describeDesktopStartupFailure, resolveStartupFailureDirectory } from './desktopStartupFailure'
 
-export async function showDesktopStartupFailure(error: unknown, language: LexoraConfig['desktop']['language'], environment?: Pick<DesktopEnvironment, 'paths' | 'diagnostics'>): Promise<void> {
-  const directory = environment ? resolveStartupFailureDirectory(error, environment.paths) : undefined
+export async function showDesktopStartupFailure(error: unknown, language: LexoraConfig['desktop']['language'], environment?: Pick<DesktopEnvironment, 'paths' | 'diagnostics'>, recheck?: () => Promise<void>): Promise<void> {
+  let directory = environment ? resolveStartupFailureDirectory(error, environment.paths) : undefined
   const diagnostics = environment?.diagnostics
   diagnostics?.record({ scope: 'desktop', level: 'info', event: 'startup.recovery.presented' })
   const status = await diagnostics?.flushWithin()
   const logsAvailable = !!status && status.written > 0 && status.failed === 0 && status.dropped === 0 && status.pendingBytes === 0 && status.unconfirmed === 0
-  const options = describeDesktopStartupFailure(error, language, diagnostics?.launchId, directory, logsAvailable)
+  let options = describeDesktopStartupFailure(error, language, diagnostics?.launchId, directory, logsAvailable)
+  if (!app.isReady()) {
+    try {
+      await app.whenReady()
+    }
+    catch {}
+  }
   if (!app.isReady()) {
     dialog.showErrorBox(options.message, options.detail ?? '')
     return
@@ -25,14 +35,28 @@ export async function showDesktopStartupFailure(error: unknown, language: Lexora
     await dialog.showMessageBox({ ...options, buttons: [translateDesktopNative(language, 'quit')], cancelId: 0 })
     return
   }
-  while (true) {
-    const { response } = await dialog.showMessageBox(options)
-    const recoveryAction = response === 0 ? 'retry' : response === 1 ? 'open_logs' : response === 2 && directory ? 'show_directory' : 'quit'
+  const recoveryOptions = () => ({ ...options, message: translateDesktopNative(language, 'startupRecoveryTitle'), detail: `${translateDesktopNative(language, 'startupRecoveryIsolation')}\n\n${options.detail ?? ''}` })
+  const act = async (recoveryAction: RecoveryAction, active: () => boolean): Promise<RecoveryActionResult> => {
     const operationId = randomUUID()
     const context = { scope: 'desktop', recoveryAction, operationId } as const
     environment.diagnostics.record({ ...context, level: 'info', event: 'startup.recovery.action_requested' })
     try {
       if (recoveryAction === 'retry') {
+        if (recheck) {
+          environment.diagnostics.record({ ...context, level: 'info', event: 'startup.recovery.recheck_started' })
+          try {
+            await recheck()
+          }
+          catch (error) {
+            environment.diagnostics.record({ ...context, level: 'warn', event: 'startup.recovery.recheck_failed', ...readDiagnosticError(error) })
+            directory = resolveStartupFailureDirectory(error, environment.paths)
+            options = describeDesktopStartupFailure(error, language, diagnostics?.launchId, directory, logsAvailable)
+            return { done: false, message: translateDesktopNative(language, 'startupRecheckFailed'), options: recoveryOptions() }
+          }
+          environment.diagnostics.record({ ...context, level: 'info', event: 'startup.recovery.recheck_completed' })
+        }
+        if (!active())
+          return { done: false }
         app.relaunch({ args: recoveryRelaunchArgs(process.argv, environment.diagnostics.launchId) })
       }
       else if (recoveryAction === 'open_logs') {
@@ -43,13 +67,27 @@ export async function showDesktopStartupFailure(error: unknown, language: Lexora
         shell.showItemInFolder(directory)
       }
       environment.diagnostics.record({ ...context, level: 'info', event: 'startup.recovery.action_dispatched' })
-      if (recoveryAction === 'retry' || recoveryAction === 'quit')
-        return
+      return { done: recoveryAction === 'retry' || recoveryAction === 'quit' }
     }
     catch {
       environment.diagnostics.record({ ...context, level: 'warn', event: 'startup.recovery.action_failed', errorCode: recoveryAction === 'retry' ? 'RELAUNCH_FAILED' : 'DIRECTORY_OPEN_FAILED' })
-      await dialog.showMessageBox({ type: 'warning', title: options.title, message: translateDesktopNative(language, recoveryAction === 'retry' ? 'restartFailed' : 'directoryOpenFailed') })
+      return { done: false, message: translateDesktopNative(language, recoveryAction === 'retry' ? 'restartFailed' : 'directoryOpenFailed') }
     }
+  }
+  try {
+    await showRecoveryWindow(recoveryOptions(), translateDesktopNative(language, 'startupRechecking'), act)
+    return
+  }
+  catch {
+    environment.diagnostics.record({ scope: 'desktop', level: 'warn', event: 'startup.recovery.window_failed', errorCode: 'RECOVERY_WINDOW_FAILED' })
+  }
+  while (true) {
+    const { response } = await dialog.showMessageBox(options)
+    const result = await act(response === 0 ? 'retry' : response === 1 ? 'open_logs' : response === 2 && directory ? 'show_directory' : 'quit', () => true)
+    if (result.done)
+      return
+    if (result.message)
+      await dialog.showMessageBox({ type: 'warning', title: options.title, message: result.message })
   }
 }
 

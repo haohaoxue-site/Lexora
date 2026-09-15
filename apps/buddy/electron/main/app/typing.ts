@@ -14,6 +14,7 @@ export interface DesktopEnvironment {
   initialLaunchIntent: DesktopLaunchIntent
   isSmokeTest: boolean
   paths: BuddyRuntimePaths
+  windowStateAvailable: boolean
   setAutostart: (enabled: boolean) => Promise<void>
   trayIconPath: string
 }

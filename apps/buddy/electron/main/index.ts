@@ -1,3 +1,3 @@
 import { startDesktopApplication } from './app/DesktopApplication'
 
-startDesktopApplication()
+void startDesktopApplication()
