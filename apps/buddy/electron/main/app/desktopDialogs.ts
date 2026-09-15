@@ -5,17 +5,40 @@ import type { DesktopEnvironment, DesktopQuitHost, DesktopQuitOptions } from './
 import { app, dialog, ipcMain, Notification, shell } from 'electron'
 import { translateDesktopNative } from '../desktopNativeI18n'
 import { confirmDraftFlushBeforeQuit, requestRendererDraftFlush } from '../rendererDraftLifecycle'
-import { describeDesktopStartupFailure } from './desktopStartupFailure'
+import { describeDesktopStartupFailure, resolveStartupFailureDirectory } from './desktopStartupFailure'
 
-export async function showDesktopStartupFailure(error: unknown, language: LexoraConfig['desktop']['language'], environment?: DesktopEnvironment): Promise<void> {
-  const options = describeDesktopStartupFailure(error, language, environment?.diagnostics.launchId)
+export async function showDesktopStartupFailure(error: unknown, language: LexoraConfig['desktop']['language'], environment?: Pick<DesktopEnvironment, 'paths' | 'diagnostics'>): Promise<void> {
+  const directory = environment ? resolveStartupFailureDirectory(error, environment.paths) : undefined
+  const options = describeDesktopStartupFailure(error, language, environment?.diagnostics.launchId, directory)
   if (!app.isReady()) {
     dialog.showErrorBox(options.message, options.detail ?? '')
     return
   }
-  const { response } = await dialog.showMessageBox({ ...options, ...(!environment ? { buttons: [translateDesktopNative(language, 'quit')] } : {}) })
-  if (response === 1 && environment)
-    await shell.openPath(environment.paths.logs)
+  if (!environment) {
+    await dialog.showMessageBox({ ...options, buttons: [translateDesktopNative(language, 'quit')], cancelId: 0 })
+    return
+  }
+  while (true) {
+    const { response } = await dialog.showMessageBox(options)
+    if (response === 0) {
+      app.relaunch()
+      return
+    }
+    if (response !== 1 && !(response === 2 && directory))
+      return
+    try {
+      if (response === 1) {
+        if (await shell.openPath(environment.paths.logs))
+          throw new Error('DIRECTORY_OPEN_FAILED')
+      }
+      else if (directory) {
+        shell.showItemInFolder(directory)
+      }
+    }
+    catch {
+      await dialog.showMessageBox({ type: 'warning', title: options.title, message: translateDesktopNative(language, 'directoryOpenFailed') })
+    }
+  }
 }
 
 export function confirmDesktopQuit(host: DesktopQuitHost, options: DesktopQuitOptions): Promise<boolean> {

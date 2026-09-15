@@ -57,6 +57,23 @@ try {
   assert.ok(!inspect(preserved).allows.includes('S-1-3-0'))
   checks.push('existing inherited CREATOR OWNER templates are accepted without changing ACLs or data')
 
+  for (const [name, grant] of [
+    ['users-attributes', '(A;;0x80;;;BU)'],
+    ['everyone-metadata', '(A;OICI;0x120080;;;WD)'],
+    ['app-packages-metadata', '(A;OICIIO;0x120080;;;AC)'],
+  ]) {
+    const path = join(directory, name!)
+    await ensurePrivateDirectories([path], helper)
+    const before = inspect(path, `O:CURRENTD:P(A;OICI;FA;;;CURRENT)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)${grant}`)
+    const sentinel = join(path, 'preserved.txt')
+    await writeFile(sentinel, 'existing-user-data')
+    await ensurePrivateDirectories([path], helper)
+    await ensurePrivateDirectories([path], helper)
+    assert.equal(inspect(path).sddl, before.sddl)
+    assert.equal(await readFile(sentinel, 'utf8'), 'existing-user-data')
+  }
+  checks.push('metadata-only grants are accepted without changing ACLs or existing files')
+
   const insecure = join(directory, 'insecure')
   await ensurePrivateDirectories([insecure], helper)
   const broad = inspect(insecure, 'O:CURRENTD:P(A;OICI;FA;;;CURRENT)(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FR;;;WD)')

@@ -12,6 +12,7 @@ use windows_sys::Win32::{
         INHERIT_ONLY_ACE, IsValidAcl, OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
         WinBuiltinAdministratorsSid, WinCreatorOwnerSid, WinLocalSystemSid,
     },
+    Storage::FileSystem::{FILE_READ_ATTRIBUTES, READ_CONTROL, SYNCHRONIZE},
     System::{
         SystemServices::{ACCESS_ALLOWED_ACE_TYPE, ACCESS_DENIED_ACE_TYPE},
         Threading::GetCurrentProcess,
@@ -20,6 +21,8 @@ use windows_sys::Win32::{
 
 use super::{DirectoryError, DirectoryFailure, DirectoryOperation, SystemErrorDomain};
 use crate::windows_security::{Sid, process_user_sid};
+
+const METADATA_READ_ACCESS: u32 = FILE_READ_ATTRIBUTES | READ_CONTROL | SYNCHRONIZE;
 
 struct LocalMemory(*mut c_void);
 
@@ -193,7 +196,10 @@ impl PrivateSecurity {
                     })?;
                     let owner_template = u32::from(header.AceFlags) & INHERIT_ONLY_ACE != 0
                         && sid == self.creator_owner;
-                    if !self.trusted.contains(&sid) && !owner_template {
+                    // SAFETY: The validated standard allow ACE includes its fixed access mask.
+                    let mask = unsafe { (*ace.cast::<ACCESS_ALLOWED_ACE>()).Mask };
+                    let metadata_only = mask & !METADATA_READ_ACCESS == 0;
+                    if !self.trusted.contains(&sid) && !owner_template && !metadata_only {
                         return Err(DirectoryFailure::new(
                             DirectoryError::Unsafe,
                             DirectoryOperation::ValidateAcl,

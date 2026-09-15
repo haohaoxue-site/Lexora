@@ -61,7 +61,12 @@ export class DesktopWindowHost {
 
   async initialize(bindings: WindowBindings): Promise<BrowserWindow> {
     const environment = this.#environment
-    const stateStore = new DesktopWindowStateStore({ path: environment.paths.windowState })
+    const stateStore = new DesktopWindowStateStore({
+      path: environment.paths.windowState,
+      onError: (operation, error) => {
+        environment.diagnostics.record({ scope: 'desktop', level: 'warn', event: `window_state.${operation}.failed`, error })
+      },
+    })
     let placement = resolveVisibleWindowPlacement(
       await stateStore.read(),
       screen.getAllDisplays().map(display => display.bounds),

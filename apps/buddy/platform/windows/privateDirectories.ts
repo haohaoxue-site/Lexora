@@ -20,7 +20,7 @@ export class PrivateDirectoryError extends Error {
     failure: PrivateDirectoryFailure,
     options?: ErrorOptions,
   ) {
-    super('Buddy private storage requires directories accessible only to the current user and Windows administrators', options)
+    super('Buddy private storage must prevent other users from reading or changing application data', options)
     this.name = 'PrivateDirectoryError'
     this.code = code
     this.failure = failure

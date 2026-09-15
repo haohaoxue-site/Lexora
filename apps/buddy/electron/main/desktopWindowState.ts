@@ -17,10 +17,12 @@ export type DesktopDisplayBounds = Omit<DesktopWindowPlacement, 'maximized'>
 
 export class DesktopWindowStateStore {
   readonly #path: string
+  readonly #onError: (operation: 'read' | 'write', error: unknown) => void
   #writeQueue: Promise<void> = Promise.resolve()
 
-  constructor(options: { path: string }) {
+  constructor(options: { path: string, onError: (operation: 'read' | 'write', error: unknown) => void }) {
     this.#path = options.path
+    this.#onError = options.onError
   }
 
   async read(): Promise<DesktopWindowPlacement | null> {
@@ -32,7 +34,8 @@ export class DesktopWindowStateStore {
         return null
       if (error instanceof SyntaxError)
         return null
-      throw error
+      this.#onError('read', error)
+      return null
     }
   }
 
@@ -58,8 +61,10 @@ export class DesktopWindowStateStore {
         await rm(temporaryPath, { force: true })
       }
     })
-    this.#writeQueue = operation.catch(() => {})
-    return operation
+    this.#writeQueue = operation.catch((error) => {
+      this.#onError('write', error)
+    })
+    return this.#writeQueue
   }
 }
 

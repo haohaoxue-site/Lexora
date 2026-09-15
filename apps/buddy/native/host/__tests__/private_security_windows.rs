@@ -57,3 +57,49 @@ fn empty_acl_and_deny_entries_do_not_grant_untrusted_access() {
         );
     }
 }
+
+#[test]
+fn metadata_only_grants_do_not_expose_directory_contents_or_allow_changes() {
+    let security = PrivateSecurity::new().unwrap();
+    for sid in ["WD", "BU", "AC", "S-1-5-21-1-2-3-1001"] {
+        for mask in [
+            0,
+            FILE_READ_ATTRIBUTES,
+            READ_CONTROL,
+            SYNCHRONIZE,
+            METADATA_READ_ACCESS,
+        ] {
+            for flags in ["", "OICI", "OICIIO", "OICIID"] {
+                let sddl = format!("O:SYD:P(A;OICI;FA;;;SY)(A;{flags};{mask:#x};;;{sid})");
+                assert_eq!(
+                    security.validate_descriptor(&from_sddl(&sddl).unwrap()),
+                    Ok(()),
+                    "{sddl}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn metadata_grants_do_not_hide_data_access_changes_or_unknown_rights() {
+    let security = PrivateSecurity::new().unwrap();
+    for bit in 0..32 {
+        let access = 1_u32 << bit;
+        if access & METADATA_READ_ACCESS != 0 {
+            continue;
+        }
+        for flags in ["", "OICIIO"] {
+            let mask = access | METADATA_READ_ACCESS;
+            let sddl = format!("O:SYD:P(A;OICI;FA;;;SY)(A;{flags};{mask:#x};;;WD)");
+            assert_eq!(
+                security.validate_descriptor(&from_sddl(&sddl).unwrap()),
+                Err(DirectoryFailure::new(
+                    DirectoryError::Unsafe,
+                    DirectoryOperation::ValidateAcl
+                )),
+                "{sddl}"
+            );
+        }
+    }
+}

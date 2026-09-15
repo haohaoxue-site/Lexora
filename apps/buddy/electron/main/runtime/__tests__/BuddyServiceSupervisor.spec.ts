@@ -1,6 +1,7 @@
 import type { ApplicationDiagnostic } from '../../../../shared/diagnostics/applicationDiagnostic'
 import type { BuddyServiceMessageProcess } from '../BuddyServicePeer'
 import type { BuddyServiceProcessInstance } from '../buddyServiceProcess'
+import type { BuddyServiceSupervisorOptions } from '../BuddyServiceSupervisor'
 import { EventEmitter } from 'node:events'
 import { Writable } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
@@ -44,6 +45,7 @@ class FakeUtilityProcess extends EventEmitter implements BuddyServiceProcessInst
 
 function createSupervisor(
   restartDelaysMs: number[] = [5],
+  readiness: Pick<BuddyServiceSupervisorOptions, 'readinessTimeoutMs'> = { readinessTimeoutMs: 100 },
 ) {
   const processes: FakeUtilityProcess[] = []
   const diagnostics: ApplicationDiagnostic[] = []
@@ -55,7 +57,7 @@ function createSupervisor(
       },
     }),
     forceKillTimeoutMs: 10,
-    readinessTimeoutMs: 100,
+    ...readiness,
     restartDelaysMs,
     shutdownTimeoutMs: 20,
     spawnService(onFatalError) {
@@ -72,6 +74,50 @@ function createSupervisor(
 }
 
 describe('buddyServiceSupervisor utility process lifecycle', () => {
+  it('keeps slow initialization and queued requests alive within the cold-start budget', async () => {
+    vi.useFakeTimers()
+    try {
+      const { processes, supervisor } = createSupervisor([], {})
+      supervisor.start()
+      const pending = supervisor.request('runtime.status', {})
+      await vi.advanceTimersByTimeAsync(35_000)
+      expect(supervisor.state.status).toBe('starting')
+      expect(processes[0]!.killed).toBe(false)
+      expect(processes[0]!.outbound).toEqual([])
+      processes[0]!.notify('runtime.ready', { protocolVersion: BUDDY_SERVICE_PROTOCOL_VERSION })
+      await vi.advanceTimersByTimeAsync(0)
+      processes[0]!.respond(0, { ready: true })
+      await expect(pending).resolves.toEqual({ ready: true })
+      const stopping = supervisor.stop()
+      await vi.advanceTimersByTimeAsync(0)
+      processes[0]!.exit()
+      await stopping
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('terminates a runtime that never becomes ready after the bounded cold-start budget', async () => {
+    vi.useFakeTimers()
+    try {
+      const { processes, supervisor } = createSupervisor([], {})
+      supervisor.start()
+      const rejected = expect(supervisor.request('runtime.status', {})).rejects.toMatchObject({ code: 'RUNTIME_UNAVAILABLE' })
+      await vi.advanceTimersByTimeAsync(119_999)
+      expect(processes[0]!.killed).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(processes[0]!.killed).toBe(true)
+      processes[0]!.exit(1)
+      await vi.advanceTimersByTimeAsync(0)
+      await rejected
+      expect(supervisor.state).toMatchObject({ status: 'offline', lastError: 'RUNTIME_READINESS_TIMEOUT' })
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('accepts startup events before readiness and rejects diagnostic payload details', async () => {
     const { processes, supervisor, diagnostics } = createSupervisor()
     supervisor.start()
