@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router'
 import { useAutomationContext } from '@/modules/automations/automationContext'
 import DesktopAutomationEditor from '@/modules/automations/widgets/editor/DesktopAutomationEditor.vue'
 import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 import { useAutomationEditorRoute } from './useAutomationEditorRoute'
 
 const props = defineProps<{
@@ -10,8 +11,8 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const { language } = useDesktopUi()
 const {
-  language,
   automations,
   providerSettings,
   spaces,

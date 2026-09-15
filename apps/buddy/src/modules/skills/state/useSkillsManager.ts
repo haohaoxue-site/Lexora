@@ -1,11 +1,16 @@
 import type { LocalSkill, LocalSkillCatalog, SkillDetail, SkillInstallPreview, SkillOrigin } from '@buddy-shared/skills/skillApi'
 import type { Ref } from 'vue'
 import type { SkillsContext } from '../skillsContext'
+import type { BuddyLocale } from '@/i18n/buddyI18n'
 import { useEventListener } from '@vueuse/core'
 import { onScopeDispose, shallowRef, watch } from 'vue'
 import { resolveLocalChatErrorMessage } from '@/shared/lib/localChatError'
 
-export function useSkillsManager(context: SkillsContext, scope: Readonly<Ref<string | null>>, enabled: Readonly<Ref<boolean>> = shallowRef(true)) {
+interface SkillsManagerOptions extends Pick<SkillsContext, 'api' | 'ready' | 'spaces'> {
+  language: Readonly<Ref<BuddyLocale>>
+}
+
+export function useSkillsManager(context: SkillsManagerOptions, scope: Readonly<Ref<string | null>>, enabled: Readonly<Ref<boolean>> = shallowRef(true)) {
   const catalog = shallowRef<LocalSkillCatalog | null>(null)
   const detail = shallowRef<SkillDetail | null>(null)
   const selectedSkill = shallowRef<LocalSkill | null>(null)

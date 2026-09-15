@@ -323,8 +323,8 @@ importers:
         specifier: ^18.0.5
         version: 18.0.5
       markstream-vue:
-        specifier: ^2.0.6
-        version: 2.0.6(katex@0.16.47)(vue-i18n@11.4.5(vue@3.5.35(typescript@6.0.3)))(vue@3.5.35(typescript@6.0.3))
+        specifier: ^2.0.11
+        version: 2.0.11(katex@0.16.47)(vue-i18n@11.4.5(vue@3.5.35(typescript@6.0.3)))(vue@3.5.35(typescript@6.0.3))
       minisearch:
         specifier: 7.2.0
         version: 7.2.0
@@ -4846,6 +4846,10 @@ packages:
     resolution: {integrity: sha512-zwfzJecQ/Uej6tusMqwAqU/6KL2XaB2VZ2Jg54Je6ahNBGNH6Ek6g3jjNCF0fG9EWQKGZNddNjU5F1ZQn/sBnA==}
     engines: {node: '>=20.19.0'}
 
+  entities@8.1.0:
+    resolution: {integrity: sha512-kxL7msIffSuh9aaFAMD7rxAIuTRMAHMeBtgHW2yUdWw732ZNh4MehkF2gdjvtdmikkaIP9bFDDJOPlsvm7avrA==}
+    engines: {node: '>=20.19.0'}
+
   env-paths@2.2.1:
     resolution: {integrity: sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A==}
     engines: {node: '>=6'}
@@ -6083,8 +6087,8 @@ packages:
   markdown-it-task-checkbox@1.0.6:
     resolution: {integrity: sha512-7pxkHuvqTOu3iwVGmDPeYjQg+AIS9VQxzyLP9JCg9lBjgPAJXGEkChK6A2iFuj3tS0GV3HG2u5AMNhcQqwxpJw==}
 
-  markdown-it-ts@1.1.0:
-    resolution: {integrity: sha512-ycYoj3jeP0zHW9u4vxtSuuq9JaitIRxxYbRtns9D4fDR5mzSpFnb855KclFBGiKFJxVi+8EkMB938oZpdDVc0A==}
+  markdown-it-ts@1.1.2:
+    resolution: {integrity: sha512-17qO3LQLK+JXom5Zt6Z9l7OGWWv9eYquTxdj3xIPGe1OBHdYXrzNYA3xCgCyIj1uItv4jkqbQf6FkaqifKkySw==}
     engines: {node: '>=20.19'}
 
   markdown-it@14.2.0:
@@ -6109,11 +6113,11 @@ packages:
     engines: {node: '>= 20'}
     hasBin: true
 
-  markstream-core@2.0.6:
-    resolution: {integrity: sha512-kSGNAoTArTu9LxwyfZI+fuxanjhxwPtlW+yJM+5IJhW2jtsH9p7mSpApHC6YtJLnzeXCGS2XlqIoivzIdzy6iA==}
+  markstream-core@2.0.11:
+    resolution: {integrity: sha512-F35jzpU6982HjKPi3bTP8d0TAGXDsQIux1ZlpIU+jQRa/0DCbIC/4AM0UxbOUiHc7bwluaMDMVgQe6uaGTU3PQ==}
 
-  markstream-vue@2.0.6:
-    resolution: {integrity: sha512-87skNadimBbQFZbb6kNgIrCpXr5x63YW4MYkRbWHh/g/1+BHJ2t3iIzEsSIIES1yn29STf4ZLw1ruepZqXZeXg==}
+  markstream-vue@2.0.11:
+    resolution: {integrity: sha512-p7hWU+SSFlfsYAfUPxo0Fg3YfxF/kRF5XT+TdsmF/2xhBagTKvhtfHdX4bE4ZU7PWL8eoAor/L3qhuhlavBkBg==}
     peerDependencies:
       '@antv/infographic': ^0.2.3
       '@terrastruct/d2': '>=0.1.33'
@@ -7759,8 +7763,8 @@ packages:
   std-env@4.1.0:
     resolution: {integrity: sha512-Rq7ybcX2RuC55r9oaPVEW7/xu3tj8u4GeBYHBWCychFtzMIr86A7e3PPEBPT37sHStKX3+TiX/Fr/ACmJLVlLQ==}
 
-  stream-markdown-parser@1.2.12:
-    resolution: {integrity: sha512-gT6GWlOfNTVGBEM66Me1DZ1cZZ/Mm4tcpJ4br8Zvz2CQhiWueEv+xFBBHCwls/XG4E63DygTd890rDdV+D6JxA==}
+  stream-markdown-parser@1.2.16:
+    resolution: {integrity: sha512-5MEAPd3zxbwvpr8jimBMaptNOPoALvKwUOAVIzXk/92SmOppEN+ZWTinNeFcS219qFjlt08mDLGHW0MDTIlXNA==}
 
   string-width@4.2.3:
     resolution: {integrity: sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==}
@@ -13096,6 +13100,8 @@ snapshots:
 
   entities@8.0.0: {}
 
+  entities@8.1.0: {}
+
   env-paths@2.2.1: {}
 
   env-paths@3.0.0: {}
@@ -14455,9 +14461,9 @@ snapshots:
 
   markdown-it-task-checkbox@1.0.6: {}
 
-  markdown-it-ts@1.1.0:
+  markdown-it-ts@1.1.2:
     dependencies:
-      entities: 8.0.0
+      entities: 8.1.0
       linkify-it: 6.1.0
       mdurl: 2.1.0
       punycode.js: 2.3.1
@@ -14479,14 +14485,14 @@ snapshots:
 
   marked@18.0.5: {}
 
-  markstream-core@2.0.6: {}
+  markstream-core@2.0.11: {}
 
-  markstream-vue@2.0.6(katex@0.16.47)(vue-i18n@11.4.5(vue@3.5.35(typescript@6.0.3)))(vue@3.5.35(typescript@6.0.3)):
+  markstream-vue@2.0.11(katex@0.16.47)(vue-i18n@11.4.5(vue@3.5.35(typescript@6.0.3)))(vue@3.5.35(typescript@6.0.3)):
     dependencies:
       '@chenglou/pretext': 0.0.8
       '@floating-ui/dom': 1.8.0
-      markstream-core: 2.0.6
-      stream-markdown-parser: 1.2.12
+      markstream-core: 2.0.11
+      stream-markdown-parser: 1.2.16
       vue: 3.5.35(typescript@6.0.3)
     optionalDependencies:
       katex: 0.16.47
@@ -16386,7 +16392,7 @@ snapshots:
 
   std-env@4.1.0: {}
 
-  stream-markdown-parser@1.2.12:
+  stream-markdown-parser@1.2.16:
     dependencies:
       markdown-it-container: 4.0.0
       markdown-it-footnote: 4.0.0
@@ -16394,7 +16400,7 @@ snapshots:
       markdown-it-mark: 4.0.0
       markdown-it-sup: 2.0.0
       markdown-it-task-checkbox: 1.0.6
-      markdown-it-ts: 1.1.0
+      markdown-it-ts: 1.1.2
 
   string-width@4.2.3:
     dependencies:

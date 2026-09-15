@@ -2,14 +2,11 @@
 import { RouterView } from 'vue-router'
 import { useSettingsContext } from '@/modules/settings/settingsContext'
 import DesktopSettingsSidebar from '@/modules/settings/widgets/navigation/DesktopSettingsSidebar.vue'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 import DesktopWorkbenchLayout from '@/shared/ui/workbench-layout/DesktopWorkbenchLayout.vue'
 
-const {
-  applicationSettings,
-  appSidebarCollapsed,
-  platformCapabilities,
-} = useSettingsContext()
-const { language } = applicationSettings
+const { platformCapabilities } = useSettingsContext()
+const { language, appSidebarCollapsed } = useDesktopUi()
 </script>
 
 <template>

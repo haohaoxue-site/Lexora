@@ -2,8 +2,9 @@ import type { LocalMessage } from '@buddy-shared/conversation/conversationApi'
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest'
-import { createSSRApp } from 'vue'
+import { createSSRApp, h, shallowRef } from 'vue'
 import { renderToString } from 'vue/server-renderer'
+import { useProvideDesktopUi } from '@/shared/ui/desktopUiContext'
 import BuddyChatMessageContent from '../BuddyChatMessageContent.vue'
 
 describe('buddyChatMessageContent', () => {
@@ -30,6 +31,14 @@ describe('buddyChatMessageContent', () => {
     expect(document.body.textContent).toContain('<img src="https://example.com/pixel.png" alt="像素">')
   })
 
+  it.each([false, true])('propagates the application dark mode to nested Markdown: %s', async (isDark) => {
+    const html = await renderMessage('assistant', '- 外层列表\n\n  > 嵌套引用与 `code`', isDark)
+    const roots = [...parseHtml(html).querySelectorAll('.markstream-vue')]
+    expect(roots.length).toBeGreaterThan(1)
+    for (const root of roots)
+      expect(root.classList.contains('dark')).toBe(isDark)
+  })
+
   it.each([false, true])('renders inline-only snapshots once above the body and keeps named references readable (independent attachment: %s)', async (panel) => {
     const html = await renderStructuredUserMessage(panel)
     const document = parseHtml(html)
@@ -54,7 +63,7 @@ function parseHtml(html: string): Document {
   return new DOMParser().parseFromString(html, 'text/html')
 }
 
-async function renderMessage(role: LocalMessage['role'], text: string): Promise<string> {
+async function renderMessage(role: LocalMessage['role'], text: string, isDark = false): Promise<string> {
   const message = {
     attachments: [],
     branchId: 'branch-1',
@@ -66,11 +75,7 @@ async function renderMessage(role: LocalMessage['role'], text: string): Promise<
     runId: null,
   } as LocalMessage
 
-  return renderToString(createSSRApp(BuddyChatMessageContent, {
-    language: 'zh-CN',
-    message,
-    writeClipboardText: async () => {},
-  }))
+  return renderContent(message, isDark)
 }
 
 async function renderStructuredUserMessage(panel: boolean): Promise<string> {
@@ -107,9 +112,22 @@ async function renderStructuredUserMessage(panel: boolean): Promise<string> {
     runId: null,
   } as LocalMessage
 
-  return renderToString(createSSRApp(BuddyChatMessageContent, {
-    language: 'zh-CN',
-    message,
-    writeClipboardText: async () => {},
+  return renderContent(message)
+}
+
+function renderContent(message: LocalMessage, isDark = false) {
+  return renderToString(createSSRApp({
+    setup() {
+      useProvideDesktopUi({
+        language: shallowRef('zh-CN'),
+        isDark: shallowRef(isDark),
+        appSidebarCollapsed: shallowRef(false),
+      })
+      return () => h(BuddyChatMessageContent, {
+        language: 'zh-CN',
+        message,
+        writeClipboardText: async () => {},
+      })
+    },
   }))
 }

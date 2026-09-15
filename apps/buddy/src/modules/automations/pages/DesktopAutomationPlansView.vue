@@ -9,12 +9,11 @@ import { useAutomationContext } from '@/modules/automations/automationContext'
 import DesktopAutomationList from '@/modules/automations/widgets/list/DesktopAutomationList.vue'
 import DesktopRuntimePane from '@/platform/runtime/DesktopRuntimePane.vue'
 import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 
 const router = useRouter()
-const {
-  language,
-  automations,
-} = useAutomationContext()
+const { language } = useDesktopUi()
+const { automations } = useAutomationContext()
 const { t } = useBuddyI18n(language)
 const message = useMessage()
 

@@ -5,6 +5,7 @@ import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useBuddyI18n } from '@/i18n/buddyI18n'
 import { DESKTOP_ROUTE_NAMES, desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 import DesktopIcon from '@/shared/ui/icon/DesktopIcon.vue'
 import SkillIcon from '@/shared/ui/icon/SkillIcon.vue'
 import { useSkillsContext } from '../skillsContext'
@@ -15,14 +16,14 @@ import DesktopSkillList from './DesktopSkillList.vue'
 import DesktopSkillsToolbar from './DesktopSkillsToolbar.vue'
 
 const context = useSkillsContext()
-const { language } = context
+const { language } = useDesktopUi()
 const { t } = useBuddyI18n(language)
 const route = useRoute()
 const router = useRouter()
 const scope = computed(() => typeof route.query.space === 'string' ? route.query.space : null)
 const category = computed(() => scope.value || route.query.scope === 'space' ? 'space' as const : 'global' as const)
 const hasScope = computed(() => category.value === 'global' || !!scope.value)
-const manager = useSkillsManager(context, scope, hasScope)
+const manager = useSkillsManager({ ...context, language }, scope, hasScope)
 const { catalog, detail, selectedSkill, detailLoading, detailError, preview, busy, loading, error, inspect, closeDetail, startPreview, closePreview, install, setEnabled, remove, reveal } = manager
 const scopeLabel = computed(() => scope.value ? context.spaces.value.find(space => space.id === scope.value)?.name ?? t('desktop.skills.spaces') : t('skill.source.global'))
 const lastSpace = shallowRef<string | null>(null)

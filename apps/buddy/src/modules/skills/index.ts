@@ -1,1 +1,1 @@
-export { skillsContextKey } from './skillsContext'
+export { useProvideSkillsContext } from './skillsContext'

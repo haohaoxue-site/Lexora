@@ -25,7 +25,7 @@ function fixture() {
   const scope = shallowRef<string | null>(null)
   const owner = effectScope()
   scopes.push(owner)
-  const manager = owner.run(() => useSkillsManager({ api, ready: Promise.resolve(), language: shallowRef('zh-CN'), spaces: shallowRef([]), writeClipboardText: async () => {} }, scope))!
+  const manager = owner.run(() => useSkillsManager({ api, ready: Promise.resolve(), language: shallowRef('zh-CN'), spaces: shallowRef([]) }, scope))!
   return { api, scope, owner, manager }
 }
 

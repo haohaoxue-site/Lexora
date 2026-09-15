@@ -6,12 +6,11 @@ import type { DesktopDataSettingsCapability } from './state/desktopDataSettingsC
 import type { McpSettingsCapability } from './state/useMcpSettingsCapability'
 import type { WebSettingsCapability } from './state/useWebSettingsCapability'
 import type { ModelProvidersStore } from '@/modules/models'
-import { createInjectionContext } from '@/shared/composables/createInjectionContext'
+import { createInjectionState } from '@vueuse/core'
 
 export interface SettingsContext {
   appInfo: Readonly<Ref<DesktopAppInfo | null>>
   applicationSettings: ApplicationSettings
-  appSidebarCollapsed: Readonly<Ref<boolean>>
   dataSettings: DesktopDataSettingsCapability
   platformCapabilities: Readonly<Ref<BuddyCapabilities | null>>
   providerSettings: ModelProvidersStore
@@ -21,5 +20,15 @@ export interface SettingsContext {
   mcpSettings: McpSettingsCapability
 }
 
-export const { key: settingsContextKey, useContext: useSettingsContext }
-  = createInjectionContext<SettingsContext>('Settings')
+const [useProvideSettingsContext, injectSettingsContext] = createInjectionState(
+  (context: SettingsContext) => context,
+)
+
+export { useProvideSettingsContext }
+
+export function useSettingsContext(): SettingsContext {
+  const context = injectSettingsContext()
+  if (!context)
+    throw new Error('Settings context is unavailable')
+  return context
+}

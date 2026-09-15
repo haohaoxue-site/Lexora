@@ -6,10 +6,11 @@ import { useAutomationContext } from '@/modules/automations/automationContext'
 import DesktopAutomationHistoryList from '@/modules/automations/widgets/list/DesktopAutomationHistoryList.vue'
 import DesktopRuntimePane from '@/platform/runtime/DesktopRuntimePane.vue'
 import { desktopRouteLocations } from '@/shared/navigation/desktopRoutes'
+import { useDesktopUi } from '@/shared/ui/desktopUiContext'
 
 const router = useRouter()
+const { language } = useDesktopUi()
 const {
-  language,
   automations,
   openTask: openTaskSession,
   refreshTasks,

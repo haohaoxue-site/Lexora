@@ -10,7 +10,7 @@ import BuddyChatToolDiff from './BuddyChatToolDiff.vue'
 import BuddyChatToolRead from './BuddyChatToolRead.vue'
 import BuddyChatToolSearch from './BuddyChatToolSearch.vue'
 import BuddyChatToolToolbar from './BuddyChatToolToolbar.vue'
-import { useChatToolActions } from './chatToolActionsContext'
+import { useChatContent } from './chatContentContext'
 import DesktopTerminalTranscript from './DesktopTerminalTranscript.vue'
 
 const props = defineProps<{
@@ -22,7 +22,7 @@ const props = defineProps<{
 }>()
 
 const { t } = useBuddyI18n(() => props.language)
-const actions = useChatToolActions()
+const actions = useChatContent()
 const filePath = computed(() => props.status !== 'denied' && !props.errorCode && (props.presentation.card === 'read' || props.presentation.card === 'diff')
   ? props.presentation.path
   : undefined)

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, h, nextTick, shallowRef } from 'vue'
 import BuddyChatAgentTurn from '../BuddyChatAgentTurn.vue'
 import BuddyChatRunActivity from '../BuddyChatRunActivity.vue'
-import { chatToolActionsKey } from '../chatToolActionsContext'
+import { useProvideChatContent } from '../chatContentContext'
 import { useChatActivityNavigation } from '../useChatActivityNavigation'
 
 vi.mock('../BuddyChatActionToolbar.vue', () => ({ default: { render: () => null } }))
@@ -382,6 +382,7 @@ function mountTurn(nodes: ChatAgentTurnNode[], status: ChatAgentTurn['status'] =
   document.body.append(root)
   const app = createApp({
     setup: () => {
+      useProvideChatContent({ canPreviewFile: () => false, previewFile: () => {}, writeClipboardText: async () => {} })
       const navigation = useChatActivityNavigation()
       return () => [
         h(BuddyChatAgentTurn, { ref: view => navigation.register('run', view), language: 'zh-CN', turn: turn.value }),
@@ -389,7 +390,6 @@ function mountTurn(nodes: ChatAgentTurnNode[], status: ChatAgentTurn['status'] =
       ]
     },
   })
-  app.provide(chatToolActionsKey, { canPreviewFile: () => false, previewFile: () => {}, writeClipboardText: async () => {} })
   app.mount(root)
   cleanups.push(() => {
     app.unmount()
