@@ -160,7 +160,7 @@ function createAgentSessionDouble(
   return {
     abort: vi.fn(async () => {}),
     abortCompaction: vi.fn(),
-    agent: { clearSteeringQueue: vi.fn(), streamFunction: vi.fn() },
+    agent: { clearSteeringQueue: vi.fn(), clearFollowUpQueue: vi.fn(), streamFunction: vi.fn() },
     compact: operation,
     dispose: vi.fn(),
     model: undefined,

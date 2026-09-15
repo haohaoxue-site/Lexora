@@ -119,7 +119,7 @@ describe('attachment submission validation', () => {
     const started = await fixture.turns.start({ draftId: first.draftId, expectedRevision: first.revision, requestId: 'first' })
     const second = await fixture.draft('second', 'second.wav', bytes, { kind: 'conversation_branch', conversationId: started.conversationId, branchId: started.branchId })
     const repository = createChatQueueRepository(fixture.database)
-    const queue = new ChatQueueService({ queue: repository, turns: fixture.turns, runs: fixture.runs, requests: createTurnRequestRepository(fixture.database), launcher: fixture.launcher, runner: { steer: (_runId, prepare) => {
+    const queue = new ChatQueueService({ runInputs: createRunInputRepository(fixture.database), queue: repository, turns: fixture.turns, runs: fixture.runs, requests: createTurnRequestRepository(fixture.database), launcher: fixture.launcher, runner: { followUp: () => false, steer: (_runId, prepare) => {
       prepare()
       return true
     } } })

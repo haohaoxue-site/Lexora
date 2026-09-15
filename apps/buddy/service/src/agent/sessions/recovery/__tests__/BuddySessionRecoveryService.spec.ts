@@ -12,7 +12,7 @@ describe('buddySessionRecoveryService', () => {
       attachments: { resolveRecoveryInputReferences: async () => ({ documents: [{ attachmentId: 'audio-1', mimeType: 'audio/wav' }], images: [], missingAttachmentIds: [] }) },
       conversations: { listBranchMessages: () => [message('user-1', 'user', { text: 'Inspect audio' }), message('error-1', 'assistant', { text: '' }, 'run-1')] },
       models: { resolve: () => model() },
-      runInputs: { findByTriggeringMessageId: () => ({ runId: 'run-1', attachmentIds: ['audio-1'], prompt: 'Inspect audio', reasoning: null, serviceTier: null, contextItems: [], createdAt: '2026-09-12T00:00:00.000Z' }) },
+      runInputs: { findByMessageId: () => ({ runId: 'run-1', attachmentIds: ['audio-1'], prompt: 'Inspect audio', reasoning: null, serviceTier: null, contextItems: [], createdAt: '2026-09-12T00:00:00.000Z' }) },
       runs: { findById: () => ({ id: 'run-1', status: 'failed', errorCode: 'MODEL_INPUT_TOO_LARGE' }) as RunRecord },
       usage: { listForRun: () => delivered ? [{ totalTokens: 20 } as UsageRecord] : [] },
     })
@@ -40,7 +40,7 @@ describe('buddySessionRecoveryService', () => {
       conversations: { listBranchMessages: () => history },
       models: { resolve: () => model() },
       runInputs: {
-        findByTriggeringMessageId: messageId => ({
+        findByMessageId: messageId => ({
           attachmentIds: [],
           contextItems: [],
           createdAt: '2026-08-28T00:00:00.000Z',

@@ -7,6 +7,7 @@ import { BuddyAgentRunError } from '../../runs/runError'
 
 export interface ActiveRunSession {
   steer?: (prepare: () => BuddyInputReferenceV1, skills?: readonly SkillReference[]) => boolean
+  followUp?: (prepare: () => BuddyInputReferenceV1, skills?: readonly SkillReference[]) => boolean
   abort: () => Promise<void>
   abortCompaction: () => void
 }
@@ -79,6 +80,11 @@ export class ActiveRunRegistry {
   steer(runId: string, prepare: () => BuddyInputReferenceV1, skills?: readonly SkillReference[]): boolean {
     const state = this.#executions.get(runId)?.state
     return state && !state.controller.signal.aborted ? state.session?.steer?.(prepare, skills) ?? false : false
+  }
+
+  followUp(runId: string, prepare: () => BuddyInputReferenceV1, skills?: readonly SkillReference[]): boolean {
+    const state = this.#executions.get(runId)?.state
+    return state && !state.controller.signal.aborted ? state.session?.followUp?.(prepare, skills) ?? false : false
   }
 
   async cancel(runId: string, errorCode = 'RUN_CANCELLED'): Promise<boolean> {

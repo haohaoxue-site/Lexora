@@ -104,7 +104,7 @@ export function createChatQueueRepository(database: DatabaseSync) {
       else
         database.prepare('UPDATE chat_queue SET state = \'paused\' WHERE state = \'waiting\'').run()
     },
-    commitSteering(input: PrepareTurnRequestInput, runId: string) {
+    commitInRun(input: PrepareTurnRequestInput, runId: string) {
       return withTransaction(database, () => {
         assertScope(input)
         if (!database.prepare('SELECT id FROM chat_queue WHERE id = ? AND state IN (\'waiting\', \'paused\')').get(input.queuedMessageId!))

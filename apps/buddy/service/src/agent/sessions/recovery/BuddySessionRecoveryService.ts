@@ -37,7 +37,7 @@ export interface BuddySessionRecoveryServiceOptions {
   attachments: Pick<AttachmentService, 'resolveRecoveryInputReferences'>
   conversations: Pick<ConversationHistoryRepository, 'listBranchMessages'>
   models: Pick<ProviderExecutionModelResolver, 'resolve'>
-  runInputs: Pick<RunInputRepository, 'findByTriggeringMessageId'>
+  runInputs: Pick<RunInputRepository, 'findByMessageId'>
   runs: Pick<RunRepository, 'findById'>
   usage: Pick<UsageRepository, 'listForRun'>
 }
@@ -73,7 +73,7 @@ export class BuddySessionRecoveryService {
     for (const message of history.slice(0, boundary)) {
       if (message.role !== 'user')
         continue
-      const storedInput = this.#options.runInputs.findByTriggeringMessageId(message.id)
+      const storedInput = this.#options.runInputs.findByMessageId(message.id)
       if (!storedInput)
         continue
       const run = this.#options.runs.findById(storedInput.runId)

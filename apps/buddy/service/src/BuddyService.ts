@@ -374,7 +374,9 @@ export async function startBuddyService(
         return Boolean(space && space.revokedAt === null)
       },
     })
+    let chatQueueService: ChatQueueService | undefined
     const sessionExtensionServices: BuddySessionExtensionServices = {
+      followUp: async (runId, signal) => { await chatQueueService?.followUp(runId, signal) },
       prepareForRun: signal => connectorService.prepareForRun(signal),
       shellSandbox: await host.start('runtime.shell_sandbox', ({ defer }) => {
         const sandbox = new ShellSandboxClient(options.rpc)
@@ -435,7 +437,6 @@ export async function startBuddyService(
       sessionFactory: input => sessionFactory.create(input),
       sessions,
     })
-    let chatQueueService: ChatQueueService | undefined
     runner = await host.start('runtime.execution', ({ defer }) => {
       const service = new BuddyAgentRunner({
         executor: piTurnExecutor,
@@ -515,7 +516,7 @@ export async function startBuddyService(
       turnRequests,
     })
     chatQueueService = await host.start('runtime.chat-queue', ({ defer }) => {
-      const service = new ChatQueueService({ queue: createChatQueueRepository(options.database), turns: chatTurnService, requests: turnRequests, launcher: turnLauncher, runner, runs })
+      const service = new ChatQueueService({ queue: createChatQueueRepository(options.database), turns: chatTurnService, requests: turnRequests, launcher: turnLauncher, runner, runs, runInputs })
       defer(() => service.dispose())
       return service
     })

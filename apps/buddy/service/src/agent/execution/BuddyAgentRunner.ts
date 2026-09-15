@@ -106,6 +106,10 @@ export class BuddyAgentRunner {
     return this.#activeRuns.steer(runId, prepare, skills)
   }
 
+  followUp(runId: string, prepare: () => BuddyInputReferenceV1, skills?: readonly SkillReference[]): boolean {
+    return this.#activeRuns.followUp(runId, prepare, skills)
+  }
+
   async cancel(runId: string, errorCode = 'RUN_CANCELLED'): Promise<boolean> {
     return this.#activeRuns.cancel(runId, errorCode)
   }
